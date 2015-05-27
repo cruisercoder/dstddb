@@ -1,0 +1,24 @@
+{
+    "name": "std_database",
+    "description": "Phobos std.database candidate",
+    "homepage": "",
+    "copyright": "Copyright © 2015-, Erik Smith",
+    "authors": [
+        "Erik Smith"
+    ],
+    "libs" : ["mysqlclient","sqlite3"],
+    "dependencies": {
+    },
+    "configurations": [
+    {
+        "name": "library",
+        "targetType": "executable",
+    },
+    {
+        "name": "unittest",
+        "targetType": "executable",
+        "targetName": "unittest",
+        "dflags": ["-main"],
+    },
+    ],
+}
