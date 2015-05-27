@@ -8,7 +8,7 @@ Status: early stage project (only a few things are working)
 - Support for native (direct) drivers on the C interface or wire protocol
 - A polymorphic driver with runtime target registration and target driver selection
 - A range interface to query result sets (single pass range)
-- Support for cascade style calls
+- Support for [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style interface
 - Included reference implementations: mysql, sqlite, oracle, and ODBC
 - Support for multiple implementations of same db type
 - Input variable binding support
@@ -32,8 +32,7 @@ foreach (Row r; range) {
 }
 ```
 
-
-#### cascade style example
+#### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style example
 ```D
 Database()
     .connection("file://demo.sqlite");
