@@ -45,9 +45,9 @@ Database()
 #### poly database setup (driver registration) example
 ```D
 import std.database.poly.database;
+Database.register!(std.database.sqlite.Database)();
+Database.register!(std.database.mysql.Database)();
 Database db;
-db.register!(std.database.sqlite.Database)();
-db.register!(std.database.mysql.Database)();
 ```
 
 ## Quickstart (OSX, homebrew)

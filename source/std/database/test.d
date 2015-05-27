@@ -53,9 +53,10 @@ unittest {
 unittest {
     import std.database.poly.database;
 
-    Database db;
-    db.register!(std.database.sqlite.database.Database)();
-    db.register!(std.database.mysql.database.Database)();
+    Database.register!(std.database.sqlite.database.Database)();
+    Database.register!(std.database.mysql.database.Database)();
+
+    auto db = Database("");
 }
 
 
