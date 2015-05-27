@@ -52,6 +52,13 @@ struct Connection {
         return Statement(this, sql);
     }
 
+    // statements with bind (variadic coming)
+    Statement statement(string sql, int v1) {
+        Statement stmt = Statement(this, sql);
+        stmt.bind(1, v1);
+        return stmt;
+    }
+
     void execute(string sql) {
         writeln("sqlite execute ", sql);
         char* msg;
@@ -60,18 +67,6 @@ struct Connection {
     }
 
     // private functions
-
-    private void throw_error(string label, char *msg) {
-        // frees up pass char * as required by sqlite
-        import core.stdc.string : strlen;
-        char[] m;
-        sizediff_t sz = strlen(msg);
-        m.length = sz;
-        for(int i = 0; i != sz; i++) m[i] = msg[i];
-        sqlite3_free(msg);
-        throw new DatabaseException(label ~ m.idup);
-    }
-
 }
 
 struct Statement {
@@ -114,6 +109,38 @@ struct Statement {
     string sql() {return data_.sql_;}
     int columns() {return data_.columns_;}
 
+    void bind(int col, int value){
+        int rc = sqlite3_bind_int(
+                data_.st_, 
+                col,
+                value);
+        if (rc != SQLITE_OK) {
+            writeln(rc);
+            throw_error("sqlite3_bind_int");
+        }
+    }
+
+    void bind(int col, const char[] value){
+        if(value is null) {
+            int rc = sqlite3_bind_null(data_.st_, col);
+            if (rc != SQLITE_OK) throw_error("bind1");
+        } else {
+            //cast(void*)-1);
+            int rc = sqlite3_bind_text(
+                    data_.st_, 
+                    col,
+                    value.ptr,
+                    cast(int) value.length,
+                    null);
+            if (rc != SQLITE_OK) {
+                writeln(rc);
+                throw_error("bind2");
+            }
+        }
+    }
+
+
+
     void execute() {
         int res;
         res = sqlite3_prepare_v2(
@@ -130,6 +157,8 @@ struct Statement {
     ResultRange range() {
         return ResultRange(Result(this));
     }
+
+
 }
 
 
@@ -249,6 +278,21 @@ struct ResultRange {
         ok_ = result_.fetch();
     }
 
+}
+
+void throw_error(string label) {
+    throw new DatabaseException(label);
+}
+
+void throw_error(string label, char *msg) {
+    // frees up pass char * as required by sqlite
+    import core.stdc.string : strlen;
+    char[] m;
+    sizediff_t sz = strlen(msg);
+    m.length = sz;
+    for(int i = 0; i != sz; i++) m[i] = msg[i];
+    sqlite3_free(msg);
+    throw new DatabaseException(label ~ m.idup);
 }
 
 extern(C) int sqlite_callback(void* cb, int howmany, char** text, char** columns) {

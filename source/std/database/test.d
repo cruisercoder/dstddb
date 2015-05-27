@@ -16,6 +16,16 @@ unittest {
 }
 
 unittest {
+    // bind test
+    import std.database.sqlite.connection;
+    auto db = Database();
+    auto con = db.connection("test.sqlite");
+    create_score_table(con, "t1");
+    auto stmt = con.statement("select * from t1 where score > ?", 50);
+    write_result(stmt.range());
+}
+
+unittest {
     // cascade interface idea
     import std.database.sqlite.database;
 

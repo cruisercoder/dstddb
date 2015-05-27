@@ -41,6 +41,16 @@ Database()
     .write_result();
 ```
 
+#### input binding example
+```D
+int min_score = 50;
+Database()
+    .connection("file://demo.sqlite");
+    .statement("select * from t1 where score >= ?", min_score)
+    .range()
+    .write_result();
+```
+
 #### poly database setup (driver registration) example
 ```D
 import std.database.poly.database;
