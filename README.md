@@ -61,7 +61,7 @@ dub
 ## Implementation Notes
 
 - Support for native drivers provides first class parity with interfaces in other languages.  It also simplifies dependencies. Native drivers will also perform better for certain use cases. 
-- The major interface objects (Database, Statement, ResultRange) are reference counted structs to support determistic cleanup of resources. The GC is not used.
+- The major interface objects (Database, Statement, ResultRange) are reference counted structs (no GC) to support deterministic cleanup of resources. Row and Value are proxy structs. 
 - The poly driver uses type erasure to front other drivers and allows both runtime registration and target driver selection 
 
 
