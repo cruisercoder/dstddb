@@ -42,7 +42,7 @@ Database()
     .write_result();
 ```
 
-#### input binding example
+#### select with input binding example
 ```D
 import std.database.sqlite;
 int minScore = 50;
@@ -51,6 +51,17 @@ Database()
     .statement("select * from t1 where score >= ?", minScore)
     .range()
     .write_result();
+```
+
+#### insert with input binding example
+```D
+import std.database;
+auto db = Database();
+auto con = db.connection("mydb");
+auto stmt = con.statement("insert into table values(?,?)");
+stmt.execute("a",1);
+stmt.execute("b",2);
+stmt.execute("c",3);
 ```
 
 #### poly database setup (driver registration) example
