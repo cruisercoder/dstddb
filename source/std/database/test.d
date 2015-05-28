@@ -3,7 +3,7 @@ import std.database.util;
 import std.stdio;
 
 unittest {
-    import std.database.sqlite.connection;
+    import std.database.sqlite;
     auto db = Database();
     auto con = db.connection("test.sqlite");
     //create_simple_table(con);
@@ -17,7 +17,7 @@ unittest {
 
 unittest {
     // bind test
-    import std.database.sqlite.connection;
+    import std.database.sqlite;
     auto db = Database();
     auto con = db.connection("test.sqlite");
     create_score_table(con, "t1");
@@ -27,7 +27,7 @@ unittest {
 
 unittest {
     // cascade interface idea
-    import std.database.sqlite.database;
+    import std.database.sqlite;
 
     writeln();
     writeln("cascade write_result test");
@@ -40,7 +40,7 @@ unittest {
 } 
 
 unittest {
-    import std.database.mysql.database;
+    import std.database.mysql;
     auto db = Database();
     try {
         Connection con = db.connection("");
@@ -51,17 +51,17 @@ unittest {
 
 unittest {
     //auto db = Database(); // what happens here when no default arg on ctor?
-    import std.database.oracle.database;
+    import std.database.oracle;
     auto db = Database("something");
 }
 
 unittest {
-    import std.database.odbc.database;
+    import std.database.odbc;
     auto db = Database("something");
 }
 
 unittest {
-    import std.database.poly.database;
+    import std.database.poly;
 
     Database.register!(std.database.sqlite.database.Database)();
     Database.register!(std.database.mysql.database.Database)();

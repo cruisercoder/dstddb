@@ -3,7 +3,7 @@ import std.database.util;
 import std.stdio;
 
 void main() {
-    import std.database.sqlite.database;
+    import std.database.sqlite;
 
     writeln("--------db demo begin-------");
 

@@ -19,8 +19,9 @@ Status: early stage project (only a few things are working)
 
 #### classic example
 ```D
+import std.database;
 auto db = Database();
-auto con = db.connection("file://test.sqlite");
+auto con = db.connection("mydb");
 auto stmt = con.statement("select * from table");
 auto range = stmt.range();
 foreach (Row r; range) {
@@ -33,6 +34,7 @@ foreach (Row r; range) {
 
 #### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style example
 ```D
+import std.database.sqlite;
 Database()
     .connection("file://demo.sqlite");
     .statement("select * from t1")
@@ -42,6 +44,7 @@ Database()
 
 #### input binding example
 ```D
+import std.database.sqlite;
 int minScore = 50;
 Database()
     .connection("file://demo.sqlite");
@@ -52,7 +55,7 @@ Database()
 
 #### poly database setup (driver registration) example
 ```D
-import std.database.poly.database;
+import std.database;
 Database.register!(std.database.sqlite.Database)();
 Database.register!(std.database.mysql.Database)();
 Database db;
@@ -75,7 +78,8 @@ dub
 
 ## TODO
 
-- simplify package hierarchy for user code import (std.database.mysql vs std.database.mysql.Database)
+A very incomplete list
+
 - Add optional config parameter to Database for a variety of preferences. This can also include a default database source for connections.
 - Add a resolver hook to the Database object to resolve named sources
 - separate out dub build targets for each reference native driver
