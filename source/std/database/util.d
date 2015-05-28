@@ -29,7 +29,7 @@ void write_result(Range) (Range range) {
     foreach (Range.Row r; range) {
         for(size_t c = 0; c != r.columns; ++c) {
             if (c) write(", ");
-            write("", r[c].toString()); // not efficient
+            write("", r[c]);
         }
         writeln();
     }

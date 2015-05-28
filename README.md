@@ -24,9 +24,9 @@ auto db = Database();
 auto con = db.connection("mydb");
 auto stmt = con.statement("select * from table");
 auto range = stmt.range();
-foreach (Row r; range) {
-    for(size_t c = 0; c != r.columns; ++c) {
-        write(r[c].toString(), " ");
+foreach (Row row; range) {
+    for(size_t col = 0; col != row.columns; ++row) {
+        write(rowr[col]), " ");
     }
     writeln();
 }
