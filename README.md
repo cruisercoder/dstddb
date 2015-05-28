@@ -1,20 +1,19 @@
 # ddb
-## A proposed standard database client interface for the [D Language](http://dlang.org)
+## A proposed standard database client interface for the [D](http://dlang.org) Language
 
 Status: early stage project (only a few things are working)
 
 ### Highlights
 - A database and driver neutral interface specification
-- Support for native (direct) drivers on the C interface or wire protocol
-- A polymorphic driver with runtime target registration and target driver selection
-- A range interface to query result sets (single pass range)
-- Support for [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style interface
+- Support for native and polymorphic drivers
+- A range interface for query result sets (single pass range)
+- Support a for [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style interface
 - Included reference implementations: mysql, sqlite, oracle, and ODBC
-- Support for multiple implementations of same db type
+- Support for runtime driver registration
 - Input variable binding support
 - Array input/output binding support
-- Automatic connection pooling
-- URL style connection string
+- Connection pooling
+- URL style connection strings
 
 ## Examples
 
@@ -43,10 +42,10 @@ Database()
 
 #### input binding example
 ```D
-int min_score = 50;
+int minScore = 50;
 Database()
     .connection("file://demo.sqlite");
-    .statement("select * from t1 where score >= ?", min_score)
+    .statement("select * from t1 where score >= ?", minScore)
     .range()
     .write_result();
 ```
@@ -69,9 +68,9 @@ dub
 
 ## Implementation Notes
 
-- Support for native drivers provides first class parity with interfaces in other languages.  It also simplifies dependencies. Native drivers will also perform better for certain use cases. 
-- The major interface objects (Database, Statement, ResultRange) are reference counted structs (no GC) to support deterministic cleanup of resources. Row and Value are proxy structs. 
-- The poly driver uses type erasure to front other drivers and allows both runtime registration and target driver selection 
+- Support for native drivers provides first class parity with interfaces in other languages.  It also simplifies dependencies. Native drivers will also perform better for certain use cases.
+- The major interface objects (Database, Statement, ResultRange) are reference counted structs (no GC) to support deterministic cleanup of resources. Row and Value are proxy structs.
+- The poly driver uses type erasure to front other drivers and allows both runtime registration and target driver selection
 
 
 ## TODO
@@ -79,9 +78,7 @@ dub
 - simplify package hierarchy for user code import (std.database.mysql vs std.database.mysql.Database)
 - Add optional config parameter to Database for a variety of preferences. This can also include a default database source for connections.
 - Add a resolver hook to the Database object to resolve named sources
-- separate out dub build targets for each reference native driver 
+- separate out dub build targets for each reference native driver
 - factor out native layer stubs (oracle) but retain for testing
 - variadic input variable binder
 - logging support
-
-
