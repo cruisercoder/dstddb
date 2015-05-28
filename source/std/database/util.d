@@ -23,9 +23,11 @@ void create_score_table(Con) (Con con, string table) {
     }
 }
 
-// what is operator<<(os,) equivalent?
-// ref Range range doesn't work with cascade?
+// ref Range range doesn't work with fluent?
 void write_result(Range) (Range range) {
+    static char s[100] = '-';
+    int w = 80;
+    writeln(s[0..w-1]);
     foreach (Range.Row r; range) {
         for(size_t c = 0; c != r.columns; ++c) {
             if (c) write(", ");
@@ -33,5 +35,6 @@ void write_result(Range) (Range range) {
         }
         writeln();
     }
+    writeln(s[0..w-1]);
 }
 
