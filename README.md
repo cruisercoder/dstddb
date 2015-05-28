@@ -69,6 +69,7 @@ stmt.execute("c",3);
 import std.database;
 Database.register!(std.database.sqlite.Database)();
 Database.register!(std.database.mysql.Database)();
+Database.register!(std.database.oracle.Database)();
 Database db;
 ```
 
@@ -79,6 +80,13 @@ https://github.com/cruisercoder/ddb
 cd ddb
 dub
 ```
+
+## Status
+
+| Feature                 | sqlite | mysql  | oracle | odbc  |
+| :---------------------- | :----- | :----- | :----- | :---- |
+| simple sql select       | y      |        |        |       |
+
 
 ## Implementation Notes
 
