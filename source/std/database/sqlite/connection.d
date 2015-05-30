@@ -115,7 +115,6 @@ struct Statement {
                 col,
                 value);
         if (rc != SQLITE_OK) {
-            writeln(rc);
             throw_error("sqlite3_bind_int");
         }
     }
@@ -142,16 +141,17 @@ struct Statement {
 
 
     void execute() {
-        int res;
-        res = sqlite3_prepare_v2(
-                data_.sq_, 
-                toStringz(data_.sql_), 
-                cast(int) data_.sql_.length + 1, 
-                &data_.st_, 
-                null);
-        if (res != SQLITE_OK) throw new DatabaseException("prepare error: " ~ data_.sql_);
+        if (!data_.st_) { 
+            int res = sqlite3_prepare_v2(
+                    data_.sq_, 
+                    toStringz(data_.sql_), 
+                    cast(int) data_.sql_.length + 1, 
+                    &data_.st_, 
+                    null);
+            if (res != SQLITE_OK) throw new DatabaseException("prepare error: " ~ data_.sql_);
 
-        data_.columns_ = sqlite3_column_count(data_.st_);
+            data_.columns_ = sqlite3_column_count(data_.st_);
+        }
     }
 
     ResultRange range() {
@@ -183,10 +183,17 @@ struct Result {
         bool fetch() {
             status_ = sqlite3_step(st_);
             if (status_ == SQLITE_ROW) return true;
-            if (status_ == SQLITE_DONE) return false;
-            writeln(status_);
+            if (status_ == SQLITE_DONE) {
+                reset();
+                return false;
+            }
             //throw new DatabaseException("sqlite3_step error: status: " ~ to!string(status_));
             throw new DatabaseException("sqlite3_step error: status: ");
+        }
+
+        void reset() {
+            int status = sqlite3_reset(st_);
+            if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
         }
     }
 

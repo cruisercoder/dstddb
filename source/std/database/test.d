@@ -25,6 +25,7 @@ unittest {
     write_result(stmt.range());
 }
 
+
 unittest {
     // cascade interface idea
     import std.database.sqlite;
