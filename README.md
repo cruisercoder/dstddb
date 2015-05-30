@@ -17,10 +17,10 @@ Status: early stage project (only a few things are working)
 
 ## Examples
 
-#### classic example
+#### classic
 ```D
 import std.database;
-auto db = Database();
+auto db = Database("defaultdb");
 auto con = db.connection("mydb");
 auto stmt = con.statement("select * from table");
 auto range = stmt.range();
@@ -39,39 +39,39 @@ auto db = Database("mydb");
 db.execute("insert into table('name',123)");
 ```
 
-#### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style example
+#### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style
 ```D
 import std.database.sqlite;
-Database()
-    .connection("file://demo.sqlite");
+Database("file://demo.sqlite");
+    .connection()
     .statement("select * from t1")
     .range()
     .write_result();
 ```
 
-#### select with input binding example
+#### select with input binding
 ```D
 import std.database.sqlite;
 int minScore = 50;
-Database()
-    .connection("file://demo.sqlite");
+Database("file://demo.sqlite")
+    .connetion()
     .statement("select * from t1 where score >= ?", minScore)
     .range()
     .write_result();
 ```
 
-#### insert with input binding example
+#### insert with input binding
 ```D
 import std.database;
-auto db = Database();
-auto con = db.connection("mydb");
+auto db = Database("mydb");
+auto con = db.connection();
 auto stmt = con.statement("insert into table values(?,?)");
 stmt.execute("a",1);
 stmt.execute("b",2);
 stmt.execute("c",3);
 ```
 
-#### poly database setup (driver registration) example
+#### poly database setup (driver registration)
 ```D
 import std.database;
 Database.register!(std.database.sqlite.Database)();
@@ -106,7 +106,7 @@ dub
 
 A very incomplete list
 
-- Add optional config parameter to Database for a variety of preferences. This can also include a default database source for connections.
+- Add optional config parameter to Database for a variety of preferences. 
 - Add a resolver hook to the Database object to resolve named sources
 - separate out dub build targets for each reference native driver
 - factor out native layer stubs (oracle) but retain for testing

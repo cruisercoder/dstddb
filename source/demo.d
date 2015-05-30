@@ -11,8 +11,8 @@ void main() {
     create_score_table(db, "t1");
 
     writeln();
-    Database()
-        .connection("demo.sqlite")
+    Database("demo.sqlite")
+        .connection()
         .statement("select * from t1")
         .range()
         .write_result();

@@ -20,15 +20,20 @@ struct Database {
     }
 
     Connection connection() {
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
         if (!data_.defaultURI.length) throw new DatabaseException("no default URI");
         return Connection(this, data_.defaultURI);
     } 
 
     Connection connection(string url) {
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
         return Connection(this, url);
     } 
 
-    string defaultURI() {return data_.defaultURI;}
+    string defaultURI() {
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
+        return data_.defaultURI;
+    }
 
     private:
 

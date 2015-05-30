@@ -51,7 +51,7 @@ unittest {
 
     writeln();
     writeln("cascade write_result test");
-    Database()
+    Database("default")
         .connection("test.sqlite")
         .statement("select * from t1")
         .range()
@@ -61,7 +61,7 @@ unittest {
 
 unittest {
     import std.database.mysql;
-    auto db = Database();
+    auto db = Database("uri");
     try {
         Connection con = db.connection("");
     } catch (ConnectionException e) {
@@ -72,12 +72,12 @@ unittest {
 unittest {
     //auto db = Database(); // what happens here when no default arg on ctor?
     import std.database.oracle;
-    auto db = Database("something");
+    auto db = Database("uri");
 }
 
 unittest {
     import std.database.odbc;
-    auto db = Database("something");
+    auto db = Database("uri");
 }
 
 unittest {
@@ -86,7 +86,7 @@ unittest {
     Database.register!(std.database.sqlite.database.Database)();
     Database.register!(std.database.mysql.database.Database)();
 
-    auto db = Database("");
+    auto db = Database("uri");
 }
 
 
