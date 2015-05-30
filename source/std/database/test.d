@@ -27,6 +27,21 @@ unittest {
 
 
 unittest {
+    // bind insert test
+    import std.database.sqlite;
+    auto db = Database();
+    auto con = db.connection("test.sqlite");
+    create_score_table(con, "score", false);
+
+    auto stmt = con.statement("insert into score values(?,?)");
+    stmt.execute("a",1);
+    stmt.execute("b",2);
+    stmt.execute("c",3);
+
+    con.statement("select * from score").range().write_result();
+}
+
+unittest {
     // cascade interface idea
     import std.database.sqlite;
 

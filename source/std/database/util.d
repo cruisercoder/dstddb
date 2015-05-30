@@ -10,12 +10,13 @@ void create_simple_table(Con) (Con con, string table) {
     }
 }
 
-void create_score_table(Con) (Con con, string table) {
+void create_score_table(Con) (Con con, string table, bool data = true) {
     import std.conv;
     auto names = ["Knuth", "Hopper", "Dijkstra"];
     auto scores = [62, 48, 84];
     con.execute("drop table if exists " ~ table ~ ";");
     con.execute("create table " ~ table ~ "(name char(10), score integer);");
+    if (!data) return;
     for(int i = 0; i != names.length; ++i) {
         con.execute(
                 "insert into " ~ table ~ " values(" ~
