@@ -12,6 +12,7 @@ public import std.database.sqlite.bindings;
 import std.stdio;
 
 struct Connection {
+    alias Statement = .Statement;
 
     private struct Payload {
         Database* db;
@@ -56,15 +57,6 @@ struct Connection {
     Statement statement(string sql, int v1) {
         return Statement(this, sql, v1);
     }
-
-    void execute(string sql) {
-        writeln("sqlite execute ", sql);
-        char* msg;
-        int rc = sqlite3_exec(data_.sq, toStringz(sql), &sqlite_callback, null, &msg);
-        if (rc != SQLITE_OK) throw_error("execute", msg);
-    }
-
-    // private functions
 }
 
 struct Statement {

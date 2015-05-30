@@ -7,9 +7,8 @@ void main() {
 
     writeln("--------db demo begin-------");
 
-    auto db = Database();
-    auto con = db.connection("demo.sqlite");
-    create_score_table(con, "t1");
+    auto db = Database("demo.sqlite");
+    create_score_table(db, "t1");
 
     writeln();
     Database()

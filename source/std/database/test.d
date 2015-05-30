@@ -3,13 +3,21 @@ import std.database.util;
 import std.stdio;
 
 unittest {
+    // execute from db
     import std.database.sqlite;
-    auto db = Database();
-    auto con = db.connection("test.sqlite");
-    //create_simple_table(con);
-    string table = "t1";
+    auto db = Database("test.sqlite");
+    create_score_table(db, "score");
+    db.execute("insert into score values('Person',123)");
+    write_result(db.connection().statement("select * from score").range());
+}
 
-    create_score_table(con, table);
+unittest {
+    // classic example
+    import std.database.sqlite;
+    auto db = Database("test.sqlite");
+    string table = "t1";
+    create_score_table(db, table);
+    auto con = db.connection();
     auto stmt = con.statement("select * from " ~ table);
     auto range = stmt.range();
     write_result(range);
@@ -18,26 +26,22 @@ unittest {
 unittest {
     // bind test
     import std.database.sqlite;
-    auto db = Database();
-    auto con = db.connection("test.sqlite");
-    create_score_table(con, "t1");
-    auto stmt = con.statement("select * from t1 where score > ?", 50);
+    auto db = Database("test.sqlite");
+    create_score_table(db, "t1");
+    auto stmt = db.connection().statement("select * from t1 where score > ?", 50);
     write_result(stmt.range());
 }
-
 
 unittest {
     // bind insert test
     import std.database.sqlite;
-    auto db = Database();
-    auto con = db.connection("test.sqlite");
-    create_score_table(con, "score", false);
-
+    auto db = Database("test.sqlite");
+    create_score_table(db, "score", false);
+    auto con = db.connection();
     auto stmt = con.statement("insert into score values(?,?)");
     stmt.execute("a",1);
     stmt.execute("b",2);
     stmt.execute("c",3);
-
     con.statement("select * from score").range().write_result();
 }
 

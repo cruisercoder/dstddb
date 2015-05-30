@@ -1,17 +1,31 @@
 module std.database.util;
 
 import std.stdio;
+import std.traits;
 
-void create_simple_table(Con) (Con con, string table) {
+// expand out for different cases
+// execute: T: Connection,Database
+void execute(T) (T t, string sql) {
+    // check for bind vars with extra parameter? (possible ambiguity)
+    static if (hasMember!(T, "Connection")) { // improve 
+        t.connection().statement(sql);
+    } else {
+        auto stmt = T.Statement(t,sql);
+    }
+}
+
+void create_simple_table(Db) (Db db, string table) {
     import std.conv;
+    Db.Connection con = db.connection();
     con.execute("create table " ~ table ~ "(a integer, b integer);");
     for(int i = 0; i != 10; ++i) {
         con.execute("insert into " ~ table ~ " values(1," ~ to!string(i) ~ ");");
     }
 }
 
-void create_score_table(Con) (Con con, string table, bool data = true) {
+void create_score_table(Db) (Db db, string table, bool data = true) {
     import std.conv;
+    Db.Connection con = db.connection();
     auto names = ["Knuth", "Hopper", "Dijkstra"];
     auto scores = [62, 48, 84];
     con.execute("drop table if exists " ~ table ~ ";");

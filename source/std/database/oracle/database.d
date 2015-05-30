@@ -13,9 +13,11 @@ import std.typecons;
 struct Database {
 
     private struct Payload {
+        string defaultURI;
         OCIEnv* env_;
 
-        this(string arg) {
+        this(string defaultURI_) {
+            defaultURI = defaultURI_;
             writeln("oracle: opening database");
             ub4 mode = OCI_THREADED | OCI_OBJECT;
             sword status = OCIEnvCreate(&env_, mode, null, null, null ,null, null);
@@ -38,8 +40,8 @@ struct Database {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-    this(string arg) {
-        data_ = Data(arg);
+    this(string defaultURI) {
+        data_ = Data(defaultURI);
     }
 
 }

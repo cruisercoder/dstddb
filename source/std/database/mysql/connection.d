@@ -62,9 +62,5 @@ struct Connection {
             throw new ConnectionException("couldn't connect");
         }
     }
-
-
-    void execute(string sql) {
-    }
 }
 

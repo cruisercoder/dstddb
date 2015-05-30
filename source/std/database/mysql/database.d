@@ -21,7 +21,7 @@ struct Database {
 
     private struct Payload {}
 
-    this(string arg = "") {
+    this(string defaultURI) {
     }
 
     Connection connection(string url) {

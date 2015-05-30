@@ -13,9 +13,11 @@ import std.typecons;
 struct Database {
 
     private struct Payload {
+        string defaultURI;
         void* env_;
 
-        this(string arg) {
+        this(string defaultURI_) {
+            defaultURI = defaultURI_;
             writeln("odbc: opening database");
             SQLRETURN ret;
             ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &env_);
@@ -40,8 +42,8 @@ struct Database {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-    this(string arg) {
-        data_ = Data(arg);
+    this(string defaultURI) {
+        data_ = Data(defaultURI);
     }
 
 }

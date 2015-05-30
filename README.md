@@ -32,6 +32,13 @@ foreach (Row row; range) {
 }
 ```
 
+#### simple execute
+```D
+import std.database;
+auto db = Database("mydb");
+db.execute("insert into table('name',123)");
+```
+
 #### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style example
 ```D
 import std.database.sqlite;
