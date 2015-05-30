@@ -19,6 +19,10 @@ import std.typecons;
 
 struct Database {
 
+    static Database create(string defaultURI) {
+        return Database(defaultURI);
+    }
+
     private struct Payload {}
 
     this(string defaultURI) {

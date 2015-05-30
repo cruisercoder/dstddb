@@ -15,8 +15,8 @@ import std.stdio;
 struct Database {
     alias Connection = .Connection;
 
-    this(string defaultURI) {
-        data_ = Data(defaultURI);
+    static Database create(string defaultURI) {
+        return Database(defaultURI);
     }
 
     Connection connection() {
@@ -33,6 +33,11 @@ struct Database {
     string defaultURI() {
         version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
         return data_.defaultURI;
+    }
+
+    // package
+    this(string defaultURI) {
+        data_ = Data(defaultURI);
     }
 
     private:

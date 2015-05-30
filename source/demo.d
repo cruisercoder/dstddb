@@ -7,11 +7,11 @@ void main() {
 
     writeln("--------db demo begin-------");
 
-    auto db = Database("demo.sqlite");
+    auto db = Database.create("demo.sqlite");
     create_score_table(db, "t1");
 
     writeln();
-    Database("demo.sqlite")
+    db
         .connection()
         .statement("select * from t1")
         .range()

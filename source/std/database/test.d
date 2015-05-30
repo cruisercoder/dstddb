@@ -5,7 +5,7 @@ import std.stdio;
 unittest {
     // execute from db
     import std.database.sqlite;
-    auto db = Database("test.sqlite");
+    auto db = Database.create("test.sqlite");
     create_score_table(db, "score");
     db.execute("insert into score values('Person',123)");
     write_result(db.connection().statement("select * from score").range());
@@ -14,7 +14,7 @@ unittest {
 unittest {
     // classic example
     import std.database.sqlite;
-    auto db = Database("test.sqlite");
+    auto db = Database.create("test.sqlite");
     string table = "t1";
     create_score_table(db, table);
     auto con = db.connection();
@@ -26,7 +26,7 @@ unittest {
 unittest {
     // bind test
     import std.database.sqlite;
-    auto db = Database("test.sqlite");
+    auto db = Database.create("test.sqlite");
     create_score_table(db, "t1");
     auto stmt = db.connection().statement("select * from t1 where score > ?", 50);
     write_result(stmt.range());
@@ -35,7 +35,7 @@ unittest {
 unittest {
     // bind insert test
     import std.database.sqlite;
-    auto db = Database("test.sqlite");
+    auto db = Database.create("test.sqlite");
     create_score_table(db, "score", false);
     auto con = db.connection();
     auto stmt = con.statement("insert into score values(?,?)");
@@ -51,7 +51,7 @@ unittest {
 
     writeln();
     writeln("cascade write_result test");
-    Database("default")
+    Database.create("default")
         .connection("test.sqlite")
         .statement("select * from t1")
         .range()
@@ -61,7 +61,7 @@ unittest {
 
 unittest {
     import std.database.mysql;
-    auto db = Database("uri");
+    auto db = Database.create("uri");
     try {
         Connection con = db.connection("");
     } catch (ConnectionException e) {
@@ -70,14 +70,13 @@ unittest {
 }
 
 unittest {
-    //auto db = Database(); // what happens here when no default arg on ctor?
     import std.database.oracle;
-    auto db = Database("uri");
+    auto db = Database.create("uri");
 }
 
 unittest {
     import std.database.odbc;
-    auto db = Database("uri");
+    auto db = Database.create("uri");
 }
 
 unittest {
@@ -86,7 +85,7 @@ unittest {
     Database.register!(std.database.sqlite.database.Database)();
     Database.register!(std.database.mysql.database.Database)();
 
-    auto db = Database("uri");
+    auto db = Database.create("uri");
 }
 
 

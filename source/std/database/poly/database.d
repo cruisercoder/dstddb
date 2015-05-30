@@ -2,6 +2,7 @@ module std.database.poly.database;
 
 import std.string;
 import std.c.stdlib;
+import std.conv;
 
 public import std.database.exception;
 
@@ -10,6 +11,10 @@ import std.typecons;
 import std.container.array;
 
 struct Database {
+
+    static Database create(string defaultURI) {
+        return Database(defaultURI);
+    }
 
     // public
 
@@ -23,9 +28,9 @@ struct Database {
         databases ~= Info(name, CreateGen!Database.dispatch);
     }
 
-    this(string arg) {
+    this(string defaultURI) {
         foreach(ref d; databases) {
-            d.data = d.dispatch.create();
+            d.data = d.dispatch.create(defaultURI);
         }
     }
 
@@ -38,7 +43,7 @@ struct Database {
     // private
 
     private struct Dispatch {
-        void* function() create;
+        void* function(string defaultURI) create;
         void function(void*) destroy;
     }
 
@@ -51,14 +56,19 @@ struct Database {
     private static Array!Info databases;
 
     private template CreateGen(Database) {
-        static void* create() {
-            return new Database("");
+
+        static void* create(string defaultURI) {
+            import core.memory : GC;
+            auto p = cast(Database*) malloc(Database.sizeof);
+            return emplace!Database(p, defaultURI);
+            //GC.addRange(p, T.sizeof * values.length);
         }
 
         static void destroy(void *data) {
-            //delete cast(Database*) data; // ??
-            Database *p = cast(Database*) data;
-            delete p;
+            import core.memory : GC;
+            //GC.removeRange(data);
+            .destroy(*(cast(Database*) data));
+            free(data);
         }
 
         static Dispatch dispatch = {

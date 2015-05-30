@@ -3,6 +3,11 @@ module std.database.util;
 import std.stdio;
 import std.traits;
 
+// experimental
+D database(D) (string defaultURI) {
+    return D.create(defaultURI);
+}
+
 // expand out for different cases
 // execute: T: Connection,Database
 void execute(T) (T t, string sql) {

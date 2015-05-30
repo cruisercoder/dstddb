@@ -12,6 +12,10 @@ import std.typecons;
 
 struct Database {
 
+    static Database create(string defaultURI) {
+        return Database(defaultURI);
+    }
+
     private struct Payload {
         string defaultURI;
         OCIEnv* env_;

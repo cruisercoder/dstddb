@@ -20,14 +20,14 @@ Status: early stage project (only a few things are working)
 #### simple execute
 ```D
 import std.database;
-auto db = Database("mydb");
+auto db = Database.create("mydb");
 db.execute("insert into table('name',123)");
 ```
 
 #### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style
 ```D
 import std.database.sqlite;
-Database("file://demo.sqlite");
+Database.create("file://demo.sqlite");
     .connection()
     .statement("select * from t1")
     .range()
@@ -37,7 +37,7 @@ Database("file://demo.sqlite");
 #### classic select
 ```D
 import std.database;
-auto db = Database("defaultdb");
+auto db = Database.create("defaultdb");
 auto con = db.connection("mydb");
 auto stmt = con.statement("select * from table");
 auto range = stmt.range();
@@ -53,7 +53,7 @@ foreach (Row row; range) {
 ```D
 import std.database.sqlite;
 int minScore = 50;
-Database("file://demo.sqlite")
+Database.create("file://demo.sqlite")
     .connetion()
     .statement("select * from t1 where score >= ?", minScore)
     .range()
@@ -63,7 +63,7 @@ Database("file://demo.sqlite")
 #### insert with input binding
 ```D
 import std.database;
-auto db = Database("mydb");
+auto db = Database.create("mydb");
 auto con = db.connection();
 auto stmt = con.statement("insert into table values(?,?)");
 stmt.execute("a",1);
@@ -73,11 +73,11 @@ stmt.execute("c",3);
 
 #### poly database setup (driver registration)
 ```D
-import std.database;
+import std.database.poly;
 Database.register!(std.database.sqlite.Database)();
 Database.register!(std.database.mysql.Database)();
 Database.register!(std.database.oracle.Database)();
-Database db;
+auto db = Database.create("mydb");
 ```
 
 ## Quickstart (OSX, homebrew)
