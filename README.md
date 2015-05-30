@@ -17,21 +17,6 @@ Status: early stage project (only a few things are working)
 
 ## Examples
 
-#### classic
-```D
-import std.database;
-auto db = Database("defaultdb");
-auto con = db.connection("mydb");
-auto stmt = con.statement("select * from table");
-auto range = stmt.range();
-foreach (Row row; range) {
-    for(size_t col = 0; col != row.columns; ++row) {
-        write(rowr[col]), " ");
-    }
-    writeln();
-}
-```
-
 #### simple execute
 ```D
 import std.database;
@@ -47,6 +32,21 @@ Database("file://demo.sqlite");
     .statement("select * from t1")
     .range()
     .write_result();
+```
+
+#### classic select
+```D
+import std.database;
+auto db = Database("defaultdb");
+auto con = db.connection("mydb");
+auto stmt = con.statement("select * from table");
+auto range = stmt.range();
+foreach (Row row; range) {
+    for(size_t col = 0; col != row.columns; ++row) {
+        write(rowr[col]), " ");
+    }
+    writeln();
+}
 ```
 
 #### select with input binding
