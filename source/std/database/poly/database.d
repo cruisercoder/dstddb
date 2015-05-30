@@ -7,6 +7,7 @@ public import std.database.exception;
 
 import std.stdio;
 import std.typecons;
+import std.container.array;
 
 struct Database {
 
@@ -47,7 +48,7 @@ struct Database {
         void *data;
     }
 
-    private static Info[] databases;
+    private static Array!Info databases;
 
     private template CreateGen(Database) {
         static void* create() {
