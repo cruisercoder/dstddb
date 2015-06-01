@@ -15,8 +15,12 @@ import std.stdio;
 struct Database {
     alias Connection = .Connection;
 
-    static Database create(string defaultURI) {
-        return Database(defaultURI);
+    static Database create() {
+        return Database("");
+    }
+
+    static Database create(A...)(auto ref A args) {
+        return Database(args);
     }
 
     Connection connection() {
@@ -35,10 +39,13 @@ struct Database {
         return data_.defaultURI;
     }
 
-    // package
     this(string defaultURI) {
         data_ = Data(defaultURI);
     }
+
+    // properties?
+    string defaultURI() {return data_.defaultURI;}
+    void defaultURI(string defaultURI) {data_.defaultURI = defaultURI;}
 
     private:
 
