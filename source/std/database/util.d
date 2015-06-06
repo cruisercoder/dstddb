@@ -8,16 +8,41 @@ D database(D) (string defaultURI) {
     return D.create(defaultURI);
 }
 
+// experimental: avoiding member factory functions, but polluting names
+// good or bad?
+auto statement(C) (C con, string sql) {
+    return C.Statement(con, sql);
+}
+
+auto statement(C, T...) (C con, string sql, T args) {
+    return C.Statement(con, sql, args);
+}
+
 // expand out for different cases
 // execute: T: Connection,Database
 void execute(T) (T t, string sql) {
     // check for bind vars with extra parameter? (possible ambiguity)
     static if (hasMember!(T, "Connection")) { // improve 
-        t.connection().statement(sql);
+        // t is Database
+        //t.connection().statement(sql);
+        auto stmt = T.Statement(t.connection(), sql);
     } else {
-        auto stmt = T.Statement(t,sql);
+        // t is Connection
+        auto stmt = T.Statement(t, sql);
     }
 }
+
+void execute(T, V...) (T t, string sql, V v) {
+    // check for bind vars with extra parameter? (possible ambiguity)
+    static if (hasMember!(T, "Connection")) { // improve 
+        // t is Database
+        auto stmt = T.Statement(t.connection(), sql, v);
+    } else {
+        // t is Connection
+        auto stmt = T.Statement(t, sql, v);
+    }
+}
+
 
 void create_simple_table(Db) (Db db, string table) {
     import std.conv;

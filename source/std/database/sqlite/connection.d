@@ -49,14 +49,15 @@ struct Connection {
         data_ = Data(&db,url);
     }
 
+    /*
     Statement statement(string sql) {
-        return Statement(this, sql);
+    return Statement(this, sql);
     }
 
-    // statements with bind (variadic coming)
-    Statement statement(string sql, int v1) {
-        return Statement(this, sql, v1);
+    Statement statement(T...) (string sql, T args) {
+    return Statement(this, sql, args);
     }
+     */
 }
 
 struct Statement {
@@ -71,11 +72,10 @@ struct Statement {
         if (!data_.binds) execute();
     }
 
-    this(Connection con, string sql, int v1) {
+    this(T...) (Connection con, string sql, T args) {
         data_ = Data(con,sql);
         prepare();
-        bind(1, v1);
-        execute();
+        execute(args);
     }
 
     string sql() {return data_.sql;}
@@ -110,7 +110,6 @@ struct Statement {
         }
     }
 
-
     void execute() {
         int status = sqlite3_step(data_.st);
         if (status == SQLITE_ROW) {
@@ -120,10 +119,11 @@ struct Statement {
         } else throw new DatabaseException("step error");
     }
 
-    // temporary: reimplement with variadics
-    void execute(const char[] v1, int v2) {
-        bind(1,v1);
-        bind(2,v2);
+    void execute(T...) (T args) {
+        int col;
+        foreach (arg; args) {
+            bind(++col, arg);
+        }
         execute();
     }
 

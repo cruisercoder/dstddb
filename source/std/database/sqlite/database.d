@@ -14,6 +14,7 @@ import std.stdio;
 
 struct Database {
     alias Connection = .Connection;
+    alias Statement = .Statement;
 
     static Database create() {
         return Database("");

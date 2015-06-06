@@ -28,7 +28,10 @@ unittest {
     import std.database.sqlite;
     auto db = Database.create("test.sqlite");
     create_score_table(db, "t1");
-    auto stmt = db.connection().statement("select * from t1 where score > ?", 50);
+    auto stmt = db.connection().statement(
+            "select * from t1 where score >= ? and score < ?",
+            50,
+            80);
     write_result(stmt.range());
 }
 
