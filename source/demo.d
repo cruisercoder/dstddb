@@ -7,7 +7,7 @@ void main() {
 
     writeln("--------db demo begin-------");
 
-    /auto db = Database.create("demo.sqlite");
+    auto db = Database.create("demo.sqlite");
     //auto db = Database.create();
     //db.defaultURI("demo.sqlite");
 
