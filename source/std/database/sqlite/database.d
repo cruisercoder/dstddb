@@ -25,18 +25,18 @@ struct Database {
     }
 
     Connection connection() {
-        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
         if (!data_.defaultURI.length) throw new DatabaseException("no default URI");
         return Connection(this, data_.defaultURI);
     } 
 
     Connection connection(string url) {
-        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
         return Connection(this, url);
     } 
 
     string defaultURI() {
-        version (assert) if (!data_.refCountedStore.isInitialized) throw new RangeError();
+        version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
         return data_.defaultURI;
     }
 

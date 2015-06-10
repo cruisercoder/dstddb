@@ -70,7 +70,7 @@ void create_score_table(Db) (Db db, string table, bool data = true) {
 
 // ref Range range doesn't work with fluent?
 void write_result(Range) (Range range) {
-    static char s[100] = '-';
+    static char[100] s = '-';
     int w = 80;
     writeln(s[0..w-1]);
     foreach (Range.Row r; range) {
