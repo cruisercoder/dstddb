@@ -5,10 +5,10 @@ import std.stdio;
 
 unittest {
     import std.database.oracle;
-    auto db = Database.create("uri");
+    auto db = Database.create("oracle");
     /*
     try {
-        Connection con = db.connection("");
+        Connection con = db.connection("oracle");
     } catch (ConnectionException e) {
         writeln("ignoring can't connect");
     }

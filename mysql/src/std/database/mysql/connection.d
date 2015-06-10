@@ -3,6 +3,7 @@ module std.database.mysql.connection;
 import std.string;
 import std.typecons;
 import std.c.stdlib;
+public import std.database.resolver;
 public import std.database.exception;
 public import std.database.mysql.bindings;
 import std.database.mysql.database;
@@ -15,7 +16,9 @@ struct Connection {
         string url_;
         MYSQL *mysql_;
 
-        this(Database db, string filename) {
+        this(Database db, string name) {
+            writeln("name: ", name);
+
             mysql_ = mysql_init(null);
             if (!mysql_) {
                 throw new DatabaseException("couldn't init mysql");
@@ -43,19 +46,14 @@ struct Connection {
     }
 
     void open(string url) {
-        data_.url_ = url;
-        writeln("mysql opening ", data_.url_);
+        Source source = resolve(url);
 
-        string host = data_.url_;
-        string un="un";
-        string pw="pw";
-        string db="db";
         if (!mysql_real_connect(
                     data_.mysql_,
-                    cast(cstring) toStringz(host),
-                    cast(cstring) toStringz(un),
-                    cast(cstring) toStringz(pw),
-                    cast(cstring) toStringz(db),
+                    cast(cstring) toStringz(source.server),
+                    cast(cstring) toStringz(source.username),
+                    cast(cstring) toStringz(source.password),
+                    cast(cstring) toStringz(source.database),
                     0,
                     null,
                     0)) {
