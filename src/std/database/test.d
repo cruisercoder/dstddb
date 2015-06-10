@@ -2,19 +2,24 @@ module std.database.test;
 import std.database.util;
 import std.stdio;
 
-unittest {
+void testAll(Database) (Database db) {
+    simpleInsert(db);    
+    classicSelect(db);    
+    bindTest(db);    
+    bindInsertTest(db);    
+    cascadeTest(db);    
+    polyTest!Database();    
+}
+
+void simpleInsert(Database) (Database db) {
     // execute from db
-    import std.database.sqlite;
-    auto db = Database.create("test.sqlite");
     create_score_table(db, "score");
     db.execute("insert into score values('Person',123)");
     write_result(db.connection().statement("select * from score").range());
 }
 
-unittest {
+void classicSelect(Database) (Database db) {
     // classic example
-    import std.database.sqlite;
-    auto db = Database.create("test.sqlite");
     string table = "t1";
     create_score_table(db, table);
     auto con = db.connection();
@@ -23,10 +28,7 @@ unittest {
     write_result(range);
 }
 
-unittest {
-    // bind test
-    import std.database.sqlite;
-    auto db = Database.create("test.sqlite");
+void bindTest(Database) (Database db) {
     create_score_table(db, "t1");
     auto stmt = db.connection().statement(
             "select * from t1 where score >= ? and score < ?",
@@ -35,10 +37,8 @@ unittest {
     write_result(stmt.range());
 }
 
-unittest {
+void bindInsertTest(Database) (Database db) {
     // bind insert test
-    import std.database.sqlite;
-    auto db = Database.create("test.sqlite");
     create_score_table(db, "score", false);
     auto con = db.connection();
     auto stmt = con.statement("insert into score values(?,?)");
@@ -48,13 +48,10 @@ unittest {
     con.statement("select * from score").range().write_result();
 }
 
-unittest {
-    // cascade interface idea
-    import std.database.sqlite;
-
+void cascadeTest(Database) (Database db) {
     writeln();
     writeln("cascade write_result test");
-    Database.create("default")
+    db
         .connection("test.sqlite")
         .statement("select * from t1")
         .range()
@@ -62,34 +59,11 @@ unittest {
     writeln();
 } 
 
-unittest {
-    import std.database.mysql;
-    auto db = Database.create("uri");
-    try {
-        Connection con = db.connection("");
-    } catch (ConnectionException e) {
-        writeln("ignoring can't connect");
-    }
-}
-
-unittest {
-    import std.database.oracle;
-    auto db = Database.create("uri");
-}
-
-unittest {
-    import std.database.odbc;
-    auto db = Database.create("uri");
-}
-
-unittest {
+void polyTest(DB) () {
+    // careful to distinguiush DB from imported Database type
     import std.database.poly;
-
-    Database.register!(std.database.sqlite.database.Database)();
-    Database.register!(std.database.mysql.database.Database)();
-
+    Database.register!(DB)();
     auto db = Database.create("uri");
 }
-
 
 
