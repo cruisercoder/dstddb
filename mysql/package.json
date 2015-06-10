@@ -6,7 +6,7 @@
     "authors": [
         "Erik Smith"
     ],
-    "sourcePaths": ["src","../src"],
+    "sourcePaths": ["src","../common/src"],
     "libs" : ["mysqlclient"],
     "dependencies": {
     },

@@ -1,15 +1,12 @@
 {
-    "name": "std_database_oracle",
+    "name": "std_database_common",
     "description": "Phobos std.database candidate",
     "homepage": "",
     "copyright": "Copyright © 2015-, Erik Smith",
     "authors": [
         "Erik Smith"
     ],
-    "sourcePaths": ["src","../common/src"],
-    "libs" : ["sqlite3"],
-    "dependencies": {
-    },
+    "sourcePaths": ["src"],
     "configurations": [
     {
         "name": "library",
