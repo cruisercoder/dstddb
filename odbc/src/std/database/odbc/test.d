@@ -7,6 +7,8 @@ unittest {
     auto db = Database.create("uri");
     db.showDrivers();
 
+    auto con = Connection(db,"testdb");
+
     /*
        try {
        Connection con = db.connection("");
