@@ -5,9 +5,9 @@ pragma(lib, "sqlite3");
 import std.string;
 import std.c.stdlib;
 import std.typecons;
+import etc.c.sqlite3;
 
 import std.database.exception;
-import std.database.sqlite.bindings;
 public import std.database.sqlite.connection;
 
 import std.stdio;

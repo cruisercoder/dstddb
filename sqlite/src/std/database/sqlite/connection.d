@@ -4,10 +4,10 @@ pragma(lib, "sqlite3");
 import std.string;
 import std.typecons;
 import std.c.stdlib;
+import etc.c.sqlite3;
 
 public import std.database.exception;
 public import std.database.sqlite.database;
-public import std.database.sqlite.bindings;
 
 import std.stdio;
 
