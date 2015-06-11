@@ -7,7 +7,7 @@
         "Erik Smith"
     ],
     "sourcePaths": ["src","../common/src"],
-    "libs" : ["iodbc","sqlite3"],
+    "libs" : ["odbc","sqlite3"],
     "dependencies": {
     },
     "configurations": [
