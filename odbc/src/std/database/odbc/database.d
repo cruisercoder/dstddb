@@ -230,6 +230,20 @@ struct Statement {
 
 }
 
+static const nameSize = 256;
+
+struct Describe {
+    char[nameSize] name;
+    SQLSMALLINT nameLen;
+    SQLSMALLINT type;
+    SQLULEN size; 
+    SQLSMALLINT digits;
+    SQLSMALLINT nullable;
+    SQLCHAR* data;
+    //SQLCHAR[256] data;
+    SQLLEN datLen;
+}
+
 struct Bind {
     SQLSMALLINT type;
     //SQLCHAR* data[maxData];
@@ -249,19 +263,6 @@ struct Result {
     alias Range = .ResultRange;
     alias Row = .Row;
 
-    static const nameSize = 256;
-
-    struct Describe {
-        char[nameSize] name;
-        SQLSMALLINT nameLen;
-        SQLSMALLINT type;
-        SQLULEN size; 
-        SQLSMALLINT digits;
-        SQLSMALLINT nullable;
-        SQLCHAR* data;
-        //SQLCHAR[256] data;
-        SQLLEN datLen;
-    }
 
     static const maxData = 256;
 
@@ -289,20 +290,20 @@ struct Result {
 
             for(int i = 0; i < stmt.data_.columns; ++i) {
                 describe ~= Describe();
-                //auto d = &describe[i];
+                auto d = &describe.back();
 
                 check("SQLDescribeCol", SQLDescribeCol(
                             stmt.data_.stmt,
                             cast(SQLUSMALLINT) (i+1),
-                            cast(SQLCHAR *) describe[i].name,
+                            cast(SQLCHAR *) d.name,
                             cast(SQLSMALLINT) nameSize,
-                            &describe[i].nameLen,
-                            &describe[i].type,
-                            &describe[i].size,
-                            &describe[i].digits,
-                            &describe[i].nullable));
+                            &d.nameLen,
+                            &d.type,
+                            &d.size,
+                            &d.digits,
+                            &d.nullable));
 
-                //writeln("NAME: ", describe[i].name, ", type: ", describe[i].type);
+                //writeln("NAME: ", d.name, ", type: ", d.type);
             }
         }
 
@@ -311,49 +312,48 @@ struct Result {
 
             for(int i = 0; i < stmt.data_.columns; ++i) {
                 bind ~= Bind();
-                //auto d = describe[i];
-                //auto b = bind[i];
+                auto b = &bind.back();
+                auto d = &describe[i];
 
-                bind[i].size = describe[i].size;
-                bind[i].allocSize = cast(SQLULEN) (bind[i].size + 1);
-                bind[i].data = malloc(bind[i].allocSize);
-                GC.addRange(bind[i].data, bind[i].allocSize);
+                b.size = d.size;
+                b.allocSize = cast(SQLULEN) (b.size + 1);
+                b.data = malloc(b.allocSize);
+                GC.addRange(b.data, b.allocSize);
 
                 // just INT and VARCHAR for now
-                switch (describe[i].type) {
+                switch (d.type) {
                     case SQL_INTEGER:
-                        bind[i].type = SQL_C_LONG;
+                        b.type = SQL_C_LONG;
                         break;
                     case SQL_VARCHAR:
-                        bind[i].type = SQL_C_CHAR;
+                        b.type = SQL_C_CHAR;
                         break;
                     default: 
-                        throw new DatabaseException("bind error: type: " ~ to!string(describe[i].type));
+                        throw new DatabaseException("bind error: type: " ~ to!string(d.type));
                 }
 
                 check("SQLBINDCol", SQLBindCol (
                             stmt.data_.stmt,
                             cast(SQLUSMALLINT) (i+1),
-                            bind[i].type,
-                            bind[i].data,
-                            bind[i].size,
-                            &bind[i].len));
+                            b.type,
+                            b.data,
+                            b.size,
+                            &b.len));
 
                 writeln(
                         "bind: index: ", i,
-                        ", type: ", bind[i].type,
-                        ", size: ", bind[i].size,
-                        ", allocSize: ", bind[i].allocSize);
+                        ", type: ", b.type,
+                        ", size: ", b.size,
+                        ", allocSize: ", b.allocSize);
             }
         }
 
         bool next() {
-            //writeln("+next()");
             status = SQLFetch(stmt.data_.stmt);
             if (status == SQL_SUCCESS) {
                 return true; 
             } else if (status == SQL_NO_DATA) {
-                //stmt_.reset();
+                stmt.reset();
                 return false;
             }
             check("SQLFETCH", SQL_HANDLE_STMT, stmt.data_.stmt, status);
@@ -392,15 +392,22 @@ struct Value {
 
     // bounds check or covered?
     int toInt() {
+        check(bind_.type, SQL_C_LONG);
         return *(cast(int*) bind_.data);
     }
 
     //inout(char)[]
     auto chars() {
+        check(bind_.type, SQL_C_CHAR);
         import core.stdc.string: strlen;
         auto data = cast(char*) bind_.data;
         return data ? data[0 .. strlen(data)] : data[0..0];
     }
+
+    void check(SQLSMALLINT a, SQLSMALLINT b) {
+        if (a != b) throw new DatabaseException("type mismatch");
+    }
+
 }
 
 // char*, string_ref?
