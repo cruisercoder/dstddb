@@ -166,12 +166,56 @@ struct Statement {
     this(T...) (Connection con, string sql, T args) {
         data_ = Data(con,sql);
         prepare();
-        execute(args);
+        bindAll(args);
+        execute();
     }
 
     string sql() {return data_.sql;}
     int columns() {return data_.columns;}
     int binds() {return data_.binds;}
+
+    void bind(int col, int value) {
+        data_.inputBind ~= Bind();
+        auto b = &data_.inputBind.back();
+
+        b.size = SQLINTEGER.sizeof;
+        b.allocSize = b.size;
+        b.data = malloc(b.allocSize);
+        *(cast(SQLINTEGER*) b.data) = value;
+
+        writeln(
+                "input bind: col: ", col,
+                ", value: ", *(cast(SQLINTEGER*) b.data));
+
+        check("SQLBindParameter", SQLBindParameter(
+                    data_.stmt,
+                    cast(SQLSMALLINT) col,
+                    SQL_PARAM_INPUT,
+                    SQL_C_LONG,
+                    SQL_INTEGER,
+                    0,
+                    0,
+                    b.data,
+                    b.allocSize,
+                    null));
+    }
+
+    void bind(int col, const char[] value){
+        throw new DatabaseException("not ready");
+        /*
+           check("SQLBindParameter", SQLBindParameter(
+           data_.stmt,
+           col,
+           SQL_PARAM_INPUT,
+           SQL_C_CHAR,
+           SQL_CHAR,
+           FIRSTNAME_LEN,
+           0,
+           strFirstName,
+           FIRSTNAME_LEN,
+           &lenFirstName));
+         */
+    }
 
     private:
 
@@ -182,6 +226,7 @@ struct Statement {
         bool hasRows;
         int columns;
         int binds;
+        Array!Bind inputBind;
 
         this(Connection con_, string sql_) {
             con = con_;
@@ -190,6 +235,9 @@ struct Statement {
         }
 
         ~this() {
+            for(int i = 0; i < inputBind.length; ++i) {
+                free(inputBind[i].data);
+            }
             if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
             // stmt = null? needed
         }
@@ -217,11 +265,19 @@ struct Statement {
         data_.binds = v;
         check("SQLNumResultCols", SQLNumResultCols (data_.stmt, &v));
         data_.columns = v;
+        writeln("prepare info: binds: ", data_.binds, ", columns: ", data_.columns);
     }
 
     void execute() {
         SQLRETURN ret = SQLExecute(data_.stmt);
         check("SQLExecute()", SQL_HANDLE_STMT, data_.stmt, ret);
+    }
+
+    void bindAll(T...) (T args) {
+        int col;
+        foreach (arg; args) {
+            bind(++col, arg);
+        }
     }
 
     void reset() {
@@ -280,7 +336,7 @@ struct Result {
         }
 
         ~this() {
-            for(int i = 0; i < stmt.data_.columns; ++i) {
+            for(int i = 0; i < bind.length; ++i) {
                 free(bind[i].data);
             }
         }
@@ -341,7 +397,7 @@ struct Result {
                             &b.len));
 
                 writeln(
-                        "bind: index: ", i,
+                        "output bind: index: ", i,
                         ", type: ", b.type,
                         ", size: ", b.size,
                         ", allocSize: ", b.allocSize);
@@ -349,14 +405,16 @@ struct Result {
         }
 
         bool next() {
+            //writeln("SQLFetch");
             status = SQLFetch(stmt.data_.stmt);
             if (status == SQL_SUCCESS) {
                 return true; 
             } else if (status == SQL_NO_DATA) {
+                //writeln("NODATA");
                 stmt.reset();
                 return false;
             }
-            check("SQLFETCH", SQL_HANDLE_STMT, stmt.data_.stmt, status);
+            check("SQLFetch", SQL_HANDLE_STMT, stmt.data_.stmt, status);
             return false;
         }
 

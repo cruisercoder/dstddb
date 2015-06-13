@@ -8,8 +8,8 @@ unittest {
     db.showDrivers();
 
     auto con = Connection(db,"testdb");
-    //auto stmt = Statement(con, "select name,score from score where score>=? and score<?",50,100);
-    auto stmt = Statement(con, "select name,score from score");
+    //auto stmt = Statement(con, "select name,score from score");
+    auto stmt = Statement(con, "select name,score from score where score>-? and score<?",1,3);
     writeln("columns: ", stmt.columns());
     writeln("binds: ", stmt.binds());
     auto res = Result(stmt);
