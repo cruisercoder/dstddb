@@ -254,20 +254,20 @@ struct Value {
 
     // bounds check or covered?
     int toInt() {
-        return sqlite3_column_int((*result_).data_.st_, cast(int) idx_);
+        return sqlite3_column_int(result_.data_.st_, cast(int) idx_);
     }
 
     // not efficient
     string toString() {
         import std.conv;
-        return to!string(sqlite3_column_text((*result_).data_.st_, cast(int) idx_));
+        return to!string(sqlite3_column_text(result_.data_.st_, cast(int) idx_));
     }
 
     // char*, string_ref?
 
     const(char*) toStringz() {
         // this may not work either because it's not around for the whole row
-        return sqlite3_column_text((*result_).data_.st_, cast(int) idx_);
+        return sqlite3_column_text(result_.data_.st_, cast(int) idx_);
     }
 }
 
