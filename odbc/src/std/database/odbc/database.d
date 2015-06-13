@@ -16,6 +16,8 @@ import std.typecons;
 
 import std.container.array;
 
+import core.memory : GC;
+
 //alias long SQLLEN;
 //alias ubyte SQLULEN;
 
@@ -188,9 +190,8 @@ struct Statement {
         }
 
         ~this() {
-            writeln("+~Statement");
-            if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt)); // HERE
-            writeln("-~Statement");
+            if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
+            // stmt = null? needed
         }
 
         this(this) { assert(false); }
@@ -230,11 +231,18 @@ struct Statement {
 }
 
 struct Bind {
-    //SQLCHAR* data[maxData];
     SQLSMALLINT type;
+    //SQLCHAR* data[maxData];
     void* data;
-    SQLULEN size; 
-    SQLLEN len;
+
+    // apparently the crash problem
+    //SQLULEN size; 
+    //SQLULEN allocSize; 
+    //SQLLEN len;
+
+    SQLINTEGER size; 
+    SQLINTEGER allocSize; 
+    SQLINTEGER len;
 }
 
 struct Result {
@@ -265,7 +273,18 @@ struct Result {
 
         this(Statement stmt_) {
             stmt = stmt_;
+            build_describe();
+            build_bind();
+            next();
+        }
 
+        ~this() {
+            for(int i = 0; i < stmt.data_.columns; ++i) {
+                free(bind[i].data);
+            }
+        }
+
+        void build_describe() {
             describe.reserve(stmt.data_.columns);
 
             for(int i = 0; i < stmt.data_.columns; ++i) {
@@ -285,23 +304,22 @@ struct Result {
 
                 //writeln("NAME: ", describe[i].name, ", type: ", describe[i].type);
             }
+        }
 
-            bind.reserve(stmt_.data_.columns);
-
-            //writeln("TYPEID: " ,typeid(bind[i]));
+        void build_bind() {
+            bind.reserve(stmt.data_.columns);
 
             for(int i = 0; i < stmt.data_.columns; ++i) {
                 bind ~= Bind();
                 //auto d = describe[i];
                 //auto b = bind[i];
 
-                // just INT and VARCHAR for now
-
-                //b.size = d.size;
-                //b.data = malloc(d.size + 1);
                 bind[i].size = describe[i].size;
-                bind[i].data = malloc(describe[i].size + 1);
+                bind[i].allocSize = cast(SQLULEN) (bind[i].size + 1);
+                bind[i].data = malloc(bind[i].allocSize);
+                GC.addRange(bind[i].data, bind[i].allocSize);
 
+                // just INT and VARCHAR for now
                 switch (describe[i].type) {
                     case SQL_INTEGER:
                         bind[i].type = SQL_C_LONG;
@@ -321,20 +339,12 @@ struct Result {
                             bind[i].size,
                             &bind[i].len));
 
-                //auto d = describe[i];
-                //auto b = bind[i];
-                //writeln("bind: ", i, ", type: ", b.type, ", size: ", b.size, ", len: ", b.len);
+                writeln(
+                        "bind: index: ", i,
+                        ", type: ", bind[i].type,
+                        ", size: ", bind[i].size,
+                        ", allocSize: ", bind[i].allocSize);
             }
-
-            next();
-        }
-
-        ~this() {
-            writeln("+~Result");
-            for(int i = 0; i < stmt.data_.columns; ++i) {
-                free(bind[i].data);
-            }
-            writeln("-~Result");
         }
 
         bool next() {
@@ -481,63 +491,4 @@ void throw_detail(SQLHANDLE handle, SQLSMALLINT type, string msg) {
     throw new DatabaseException(error);
 }
 
-/*
-
-   string sql() {return data_.sql;}
-   int columns() {return data_.columns;}
-
-   void bind(int col, int value){
-   int rc = sqlite3_bind_int(
-   data_.st, 
-   col,
-   value);
-   if (rc != SQLITE_OK) {
-   throw_error("sqlite3_bind_int");
-   }
-   }
-
-   void bind(int col, const char[] value){
-   if(value is null) {
-   int rc = sqlite3_bind_null(data_.st, col);
-   if (rc != SQLITE_OK) throw_error("bind1");
-   } else {
-//cast(void*)-1);
-int rc = sqlite3_bind_text(
-data_.st, 
-col,
-value.ptr,
-cast(int) value.length,
-null);
-if (rc != SQLITE_OK) {
-writeln(rc);
-throw_error("bind2");
-}
-}
-}
-
-void execute() {
-int status = sqlite3_step(data_.st);
-if (status == SQLITE_ROW) {
-data_.hasRows = true;
-} else if (status == SQLITE_DONE) {
-reset();
-} else throw new DatabaseException("step error");
-}
-
-void execute(T...) (T args) {
-int col;
-foreach (arg; args) {
-bind(++col, arg);
-}
-execute();
-}
-
-ResultRange range() {
-return ResultRange(Result(this));
-}
-
-bool hasRows() {
-return data_.hasRows;
-}
- */
 

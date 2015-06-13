@@ -9,13 +9,15 @@ unittest {
 
     auto con = Connection(db,"testdb");
     //auto stmt = Statement(con, "select name,score from score where score>=? and score<?",50,100);
-    auto stmt = Statement(con, "select name,score from score");
+    auto stmt = Statement(con, "select name,score from score where score>200");
     writeln("columns: ", stmt.columns());
     writeln("BINDS: ", stmt.binds());
     auto res = Result(stmt);
+    /*
     auto range = res.range();
     foreach(Result.Range.Row row; range) {
         writeln("row: ", row[0].chars(), ", ", row[1].toInt());
     }
+    */
 }
 
