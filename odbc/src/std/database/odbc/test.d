@@ -9,7 +9,11 @@ unittest {
 
     auto con = Connection(db,"testdb");
     //auto stmt = Statement(con, "select name,score from score");
-    auto stmt = Statement(con, "select name,score from score where score>-? and score<?",1,3);
+    auto stmt = Statement(
+            con,
+            "select name,score from score where score>? and name=?",
+            1,"c");
+
     writeln("columns: ", stmt.columns());
     writeln("binds: ", stmt.binds());
     auto res = Result(stmt);

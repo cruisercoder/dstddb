@@ -174,50 +174,54 @@ struct Statement {
     int columns() {return data_.columns;}
     int binds() {return data_.binds;}
 
-    void bind(int col, int value) {
-        data_.inputBind ~= Bind();
-        auto b = &data_.inputBind.back();
+    void bind(int n, int value) {
+        writeln("input bind: n: ", n, ", value: ", value);
 
+        Bind b;
+        b.type = SQL_C_LONG;
+        b.dbtype = SQL_INTEGER;
         b.size = SQLINTEGER.sizeof;
         b.allocSize = b.size;
         b.data = malloc(b.allocSize);
-        *(cast(SQLINTEGER*) b.data) = value;
+        inputBind(n, b);
 
-        writeln(
-                "input bind: col: ", col,
-                ", value: ", *(cast(SQLINTEGER*) b.data));
+        *(cast(SQLINTEGER*) data_.inputBind[n-1].data) = value;
+    }
+
+    void bind(int n, const char[] value){
+        import core.stdc.string: strncpy;
+        writeln("input bind: n: ", n, ", value: ", value);
+        // no null termination needed
+
+        Bind b;
+        b.type = SQL_C_CHAR;
+        b.dbtype = SQL_CHAR;
+        b.size = cast(SQLSMALLINT) value.length;
+        b.allocSize = b.size;
+        b.data = malloc(b.allocSize);
+        inputBind(n, b);
+
+        strncpy(cast(char*) b.data, value.ptr, b.size);
+    }
+
+    private:
+
+    void inputBind(int n, ref Bind bind) {
+        data_.inputBind ~= bind;
+        auto b = &data_.inputBind.back();
 
         check("SQLBindParameter", SQLBindParameter(
                     data_.stmt,
-                    cast(SQLSMALLINT) col,
+                    cast(SQLSMALLINT) n,
                     SQL_PARAM_INPUT,
-                    SQL_C_LONG,
-                    SQL_INTEGER,
+                    b.type,
+                    b.dbtype,
                     0,
                     0,
                     b.data,
                     b.allocSize,
                     null));
     }
-
-    void bind(int col, const char[] value){
-        throw new DatabaseException("not ready");
-        /*
-           check("SQLBindParameter", SQLBindParameter(
-           data_.stmt,
-           col,
-           SQL_PARAM_INPUT,
-           SQL_C_CHAR,
-           SQL_CHAR,
-           FIRSTNAME_LEN,
-           0,
-           strFirstName,
-           FIRSTNAME_LEN,
-           &lenFirstName));
-         */
-    }
-
-    private:
 
     struct Payload {
         Connection con;
@@ -302,6 +306,7 @@ struct Describe {
 
 struct Bind {
     SQLSMALLINT type;
+    SQLSMALLINT dbtype;
     //SQLCHAR* data[maxData];
     void* data;
 
