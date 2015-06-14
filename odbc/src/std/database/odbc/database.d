@@ -25,80 +25,84 @@ alias SQLINTEGER SQLLEN;
 alias SQLUINTEGER SQLULEN;
 
 struct Database {
-    public:
+    static Database create(string defaultURI) {
+        return Database(defaultURI);
+    }
 
-        static Database create(string defaultURI) {
-            return Database(defaultURI);
+    this(string defaultURI) {
+        data_ = Data(defaultURI);
+    }
+
+    void showDrivers() {
+        SQLUSMALLINT direction;
+
+        SQLCHAR driver[256];
+        SQLCHAR attr[256];
+        SQLSMALLINT driver_ret;
+        SQLSMALLINT attr_ret;
+        SQLRETURN ret;
+
+        direction = SQL_FETCH_FIRST;
+        writeln("DRIVERS:");
+        while(SQL_SUCCEEDED(ret = SQLDrivers(
+                        data_.env, 
+                        direction,
+                        driver.ptr, 
+                        driver.sizeof, 
+                        &driver_ret,
+                        attr.ptr, 
+                        attr.sizeof, 
+                        &attr_ret))) {
+            direction = SQL_FETCH_NEXT;
+            printf("%s - %s\n", driver.ptr, attr.ptr);
+            if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
         }
-
-        this(string defaultURI) {
-            data_ = Data(defaultURI);
-        }
-
-        void showDrivers() {
-            SQLUSMALLINT direction;
-
-            SQLCHAR driver[256];
-            SQLCHAR attr[256];
-            SQLSMALLINT driver_ret;
-            SQLSMALLINT attr_ret;
-            SQLRETURN ret;
-
-            direction = SQL_FETCH_FIRST;
-            writeln("DRIVERS:");
-            while(SQL_SUCCEEDED(ret = SQLDrivers(
-                            data_.env, 
-                            direction,
-                            driver.ptr, 
-                            driver.sizeof, 
-                            &driver_ret,
-                            attr.ptr, 
-                            attr.sizeof, 
-                            &attr_ret))) {
-                direction = SQL_FETCH_NEXT;
-                printf("%s - %s\n", driver.ptr, attr.ptr);
-                if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
-            }
-        }
+    }
 
     private:
 
-        struct Payload {
-            string defaultURI;
-            SQLHENV env;
+    struct Payload {
+        string defaultURI;
+        SQLHENV env;
 
-            this(string defaultURI_) {
-                defaultURI = defaultURI_;
-                check(
-                        "SQLAllocHandle", 
-                        SQLAllocHandle(
-                            SQL_HANDLE_ENV, 
-                            SQL_NULL_HANDLE,
-                            &env));
-                SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION, cast(void *) SQL_OV_ODBC3, 0);
-            }
-
-            ~this() {
-                writeln("odbc: closing database");
-                if (!env) return;
-                check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
-                env = null;
-            }
-
-            this(this) { assert(false); }
-            void opAssign(Database.Payload rhs) { assert(false); }
+        this(string defaultURI_) {
+            defaultURI = defaultURI_;
+            check(
+                    "SQLAllocHandle", 
+                    SQLAllocHandle(
+                        SQL_HANDLE_ENV, 
+                        SQL_NULL_HANDLE,
+                        &env));
+            SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION, cast(void *) SQL_OV_ODBC3, 0);
         }
 
-        private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-        private Data data_;
+        ~this() {
+            writeln("odbc: closing database");
+            if (!env) return;
+            check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
+            env = null;
+        }
 
+        this(this) { assert(false); }
+        void opAssign(Database.Payload rhs) { assert(false); }
+    }
+
+    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
+    Data data_;
 
 }
 
 struct Connection {
+    alias Database = .Database;
     alias Statement = .Statement;
 
-    private struct Payload {
+    package this(Database db, string source) {
+        data_ = Data(db,source);
+    }
+
+    private:
+
+    struct Payload {
         Database db;
         string source;
         SQLHDBC con;
@@ -147,14 +151,11 @@ struct Connection {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-    package this(Database db, string source) {
-        data_ = Data(db,source);
-    }
 }
 
 struct Statement {
     alias Result = .Result;
-    alias Range = .ResultRange;
+    //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
 
     this(Connection con, string sql) {
         data_ = Data(con,sql);
@@ -250,8 +251,8 @@ struct Statement {
         void opAssign(Statement.Payload rhs) { assert(false); }
     }
 
-    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    private Data data_;
+    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
+    Data data_;
 
     void exec() {
         check("SQLExecDirect", SQLExecDirect(data_.stmt,cast(SQLCHAR*) toStringz(data_.sql), SQL_NTS));
@@ -324,10 +325,22 @@ struct Result {
     alias Range = .ResultRange;
     alias Row = .Row;
 
+    int columns() {return data_.stmt.columns();}
+
+    this(Statement stmt) {
+        data_ = Data(stmt);
+    }
+
+    ResultRange range() {return ResultRange(this);}
+
+    bool start() {return data_.status == SQL_SUCCESS;}
+    bool next() {return data_.next();}
+
+    private:
 
     static const maxData = 256;
 
-    private struct Payload {
+    struct Payload {
         Statement stmt;
         Array!Describe describe;
         Array!Bind bind;
@@ -415,7 +428,6 @@ struct Result {
             if (status == SQL_SUCCESS) {
                 return true; 
             } else if (status == SQL_NO_DATA) {
-                //writeln("NODATA");
                 stmt.reset();
                 return false;
             }
@@ -427,25 +439,15 @@ struct Result {
         void opAssign(Statement.Payload rhs) { assert(false); }
     }
 
-    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    private Data data_;
+    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
+    Data data_;
 
-    int columns() {return data_.stmt.columns();}
-
-    this(Statement stmt) {
-        data_ = Data(stmt);
-    }
-
-    ResultRange range() {return ResultRange(this);}
-
-    public bool start() {return data_.status == SQL_SUCCESS;}
-    public bool next() {return data_.next();}
 }
 
 struct Value {
     package Bind* bind_;
 
-    public this(Bind* bind) {
+    this(Bind* bind) {
         bind_ = bind;
     }
 
@@ -467,18 +469,17 @@ struct Value {
         return data ? data[0 .. strlen(data)] : data[0..0];
     }
 
+    private:
+
     void check(SQLSMALLINT a, SQLSMALLINT b) {
         if (a != b) throw new DatabaseException("type mismatch");
     }
 
 }
 
-// char*, string_ref?
-
 struct Row {
+    alias Result = .Result;
     alias Value = .Value;
-
-    private Result* result_;
 
     this(Result* result) {
         result_ = result;
@@ -489,10 +490,13 @@ struct Row {
     Value opIndex(size_t idx) {
         return Value(&result_.data_.bind[idx]);
     }
+
+    private Result* result_;
 }
 
 struct ResultRange {
     // implements a One Pass Range
+    alias Result = .Result;
     alias Row = .Row;
 
     private Result result_;
