@@ -36,8 +36,8 @@ struct Database {
     void showDrivers() {
         SQLUSMALLINT direction;
 
-        SQLCHAR driver[256];
-        SQLCHAR attr[256];
+        SQLCHAR[256] driver;
+        SQLCHAR[256] attr;
         SQLSMALLINT driver_ret;
         SQLSMALLINT attr_ret;
         SQLRETURN ret;
@@ -535,8 +535,8 @@ void check(string msg, SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN ret)
 void throw_detail(SQLHANDLE handle, SQLSMALLINT type, string msg) {
     SQLSMALLINT i = 0;
     SQLINTEGER native;
-    SQLCHAR state[ 7 ];
-    SQLCHAR text[256];
+    SQLCHAR[7] state;
+    SQLCHAR[256] text;
     SQLSMALLINT len;
     SQLRETURN ret;
 
