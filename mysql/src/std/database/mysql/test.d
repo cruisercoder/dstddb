@@ -5,11 +5,17 @@ import std.stdio;
 unittest {
     import std.database.mysql;
     auto db = Database.create("mysql");
-    try {
-        Connection con = db.connection("mysql");
-    } catch (ConnectionException e) {
-        writeln("ignoring can't connect");
+    auto con = db.connection("mysql");
+    //auto stmt = con.statement("select * from global_status where VARIABLE_NAME='UPTIME'");
+    auto stmt = con.statement("select * from global_status where VARIABLE_NAME = ?", "UPTIME");
+    writeln("columns: ", stmt.columns());
+    writeln("binds: ", stmt.binds());
+    auto res = Result(stmt);
+    auto range = res.range();
+    foreach(Result.Range.Row row; range) {
+        writeln("row: ", row[0].chars());
     }
+    
 }
 
 unittest {
