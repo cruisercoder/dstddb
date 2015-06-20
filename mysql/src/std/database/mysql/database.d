@@ -112,6 +112,26 @@ struct Bind {
     my_bool error;
 }
 
+void binder(int n, ref Bind b, ref MYSQL_BIND mb) {
+    import core.stdc.string: memset;
+    b.bind = &mb;
+    memset(&mb, 0, MYSQL_BIND.sizeof);
+    mb.buffer_type = b.mysql_type;
+    mb.buffer = malloc(b.allocSize);
+    mb.buffer_length = b.allocSize;
+    mb.length = &b.length;
+    mb.is_null = &b.is_null;
+    mb.error = &b.error;
+
+    log(
+            "bind: index: ", n,
+            ", type: ", mb.buffer_type,
+            ", allocSize: ", b.allocSize);
+
+    //GC.addRange(b.mb.buffer, allocSize);
+}
+
+
 struct Statement {
     alias Result = .Result;
 
@@ -182,29 +202,9 @@ struct Statement {
     private:
 
     void inputBind(int n, ref Bind bind) {
-        import core.stdc.string: memset;
-
         data_.inputBind ~= bind;
-        auto b = &data_.inputBind.back();
         data_.mysqlBind ~= MYSQL_BIND();
-        auto mb = &data_.mysqlBind.back();
-
-        b.bind = mb;
-
-        memset(mb, 0, MYSQL_BIND.sizeof);
-        mb.buffer_type = b.mysql_type;
-        mb.buffer = malloc(b.allocSize);
-        mb.buffer_length = b.allocSize;
-        mb.length = &b.length;
-        mb.is_null = &b.is_null;
-        mb.error = &b.error;
-
-        //GC.addRange(b.mb.buffer, allocSize);
-
-        log(
-                "input bind: index: ", n,
-                ", type: ", mb.buffer_type,
-                ", allocSize: ", b.allocSize);
+        binder(n, data_.inputBind.back(), data_.mysqlBind.back());
     }
 
     struct Payload {
@@ -382,27 +382,11 @@ struct Result {
                 bind ~= Bind();
                 auto b = &bind.back();
                 mysqlBind ~= MYSQL_BIND();
-                auto mb = &mysqlBind.back();
 
-                b.bind = mb;
                 b.allocSize = cast(uint)(d.field.length + 1);
                 b.mysql_type = MYSQL_TYPE_STRING;
 
-                memset(mb, 0, MYSQL_BIND.sizeof);
-                mb.buffer_type = b.mysql_type;
-
-                mb.buffer = malloc(b.allocSize);
-                //GC.addRange(b.mb.buffer, b.allocSize);
-
-                mb.buffer_length = b.allocSize;
-                mb.length = &b.length;
-                mb.is_null = &b.is_null;
-                mb.error = &b.error;
-
-                log(
-                        "output bind: index: ", i,
-                        ", type: ", mb.buffer_type,
-                        ", allocSize: ", b.allocSize);
+                binder(i, bind.back(), mysqlBind.back());
             }
 
             mysql_stmt_bind_result(stmt.data_.stmt, &mysqlBind.front());
