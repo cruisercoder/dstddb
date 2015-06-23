@@ -6,6 +6,7 @@ import std.stdio;
 
 extern(System) {
 
+    /*
     sword OCIEnvCreate (
             OCIEnv **envhpp,
             ub4 mode,
@@ -26,5 +27,6 @@ extern(System) {
         writeln("(OCIHandleFree)");
         return 0;
     }
+    */
 }
 
