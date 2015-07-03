@@ -150,7 +150,6 @@ struct Statement {
     }
 
     string sql() {return data_.sql;}
-    int columns() {return data_.columns;}
     int binds() {return data_.binds;}
 
     void bind(int n, int value) {
@@ -212,7 +211,6 @@ struct Statement {
         string sql;
         MYSQL_STMT *stmt;
         bool hasRows;
-        uint columns;
         uint binds;
         Array!Bind inputBind;
         Array!MYSQL_BIND mysqlBind;
@@ -245,7 +243,6 @@ struct Statement {
                         cast(char*) sql.ptr,
                         sql.length));
 
-            columns = cast(uint) mysql_stmt_field_count(stmt);
             binds = cast(uint) mysql_stmt_param_count(stmt);
         }
 
@@ -305,7 +302,7 @@ struct Result {
     alias Range = .ResultRange;
     alias Row = .Row;
 
-    int columns() {return data_.stmt.columns();}
+    int columns() {return data_.columns;}
 
     this(Statement stmt) {
         data_ = Data(stmt);
@@ -322,11 +319,11 @@ struct Result {
 
     struct Payload {
         Statement stmt;
+        uint columns;
         Array!Describe describe;
         Array!Bind bind;
         Array!MYSQL_BIND mysqlBind;
         MYSQL_RES *result_metadata;
-        uint columns;
         int status;
 
         this(Statement stmt_) {
@@ -334,7 +331,6 @@ struct Result {
 
             result_metadata = mysql_stmt_result_metadata(stmt.data_.stmt);
             //columns = mysql_num_fields(result_metadata);
-            columns = stmt.columns();
 
             build_describe();
             build_bind();
@@ -350,6 +346,8 @@ struct Result {
 
         void build_describe() {
             import core.stdc.string: strlen;
+
+            columns = cast(uint) mysql_stmt_field_count(stmt.data_.stmt);
 
             describe.reserve(columns);
 

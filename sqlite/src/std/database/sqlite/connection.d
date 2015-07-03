@@ -79,7 +79,6 @@ struct Statement {
     }
 
     string sql() {return data_.sql;}
-    int columns() {return data_.columns;}
 
     void bind(int col, int value){
         int rc = sqlite3_bind_int(
@@ -143,7 +142,6 @@ struct Statement {
         sqlite3* sq;
         sqlite3_stmt *st;
         bool hasRows;
-        int columns;
         int binds;
 
         this(Connection con_, string sql_) {
@@ -178,7 +176,6 @@ struct Statement {
                     null);
             if (res != SQLITE_OK) throw new DatabaseException("prepare error: " ~ data_.sql);
 
-            data_.columns = sqlite3_column_count(data_.st);
             data_.binds = sqlite3_bind_parameter_count(data_.st);
         }
     }
@@ -197,11 +194,13 @@ struct Result {
     private struct Payload {
         private Statement stmt_;
         private sqlite3_stmt *st_;
+        int columns;
         int status_;
 
         this(Statement stmt) {
             stmt_ = stmt;
             st_ = stmt_.data_.st;
+            columns = sqlite3_column_count(st_);
         }
 
         //~this() {}
@@ -225,7 +224,7 @@ struct Result {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-    int columns() {return data_.stmt_.columns();}
+    int columns() {return data_.columns;}
 
     this(Statement stmt) {
         data_ = Data(stmt);

@@ -14,9 +14,9 @@ unittest {
             "select name,score from score where score>? and name=?",
             1,"c");
 
-    writeln("columns: ", stmt.columns());
     writeln("binds: ", stmt.binds());
     auto res = Result(stmt);
+    writeln("columns: ", res.columns());
     auto range = res.range();
     foreach(Result.Range.Row row; range) {
         writeln("row: ", row[0].chars(), ", ", row[1].toInt());

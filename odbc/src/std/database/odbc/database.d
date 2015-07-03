@@ -169,7 +169,6 @@ struct Statement {
     }
 
     string sql() {return data_.sql;}
-    int columns() {return data_.columns;}
     int binds() {return data_.binds;}
 
     void bind(int n, int value) {
@@ -226,7 +225,6 @@ struct Statement {
         string sql;
         SQLHSTMT stmt;
         bool hasRows;
-        int columns;
         int binds;
         Array!Bind inputBind;
 
@@ -266,8 +264,7 @@ struct Statement {
         check("SQLNumParams", SQLNumParams(data_.stmt, &v));
         data_.binds = v;
         check("SQLNumResultCols", SQLNumResultCols (data_.stmt, &v));
-        data_.columns = v;
-        log("prepare info: binds: ", data_.binds, ", columns: ", data_.columns);
+        log("binds: ", data_.binds);
     }
 
     void execute() {
@@ -322,7 +319,7 @@ struct Result {
     alias Range = .ResultRange;
     alias Row = .Row;
 
-    int columns() {return data_.stmt.columns();}
+    int columns() {return data_.columns;}
 
     this(Statement stmt) {
         data_ = Data(stmt);
@@ -339,6 +336,7 @@ struct Result {
 
     struct Payload {
         Statement stmt;
+        int columns;
         Array!Describe describe;
         Array!Bind bind;
         SQLRETURN status;
@@ -357,9 +355,15 @@ struct Result {
         }
 
         void build_describe() {
-            describe.reserve(stmt.data_.columns);
 
-            for(int i = 0; i < stmt.data_.columns; ++i) {
+            SQLSMALLINT v;
+            check("SQLNumResultCols", SQLNumResultCols (stmt.data_.stmt, &v));
+            columns = v;
+            log("columns: ", columns);
+
+            describe.reserve(columns);
+
+            for(int i = 0; i < columns; ++i) {
                 describe ~= Describe();
                 auto d = &describe.back();
 
@@ -381,9 +385,9 @@ struct Result {
         void build_bind() {
             import core.memory : GC;
 
-            bind.reserve(stmt.data_.columns);
+            bind.reserve(columns);
 
-            for(int i = 0; i < stmt.data_.columns; ++i) {
+            for(int i = 0; i < columns; ++i) {
                 bind ~= Bind();
                 auto b = &bind.back();
                 auto d = &describe[i];
