@@ -89,19 +89,21 @@ struct Connection {
     struct Payload {
         Database db;
         string source;
+        OCIError *error;
         OCISvcCtx *svc_ctx;
         bool connected;
 
         this(Database db_, string source_) {
             db = db_;
             source = source_;
+            error = db.data_.error;
 
             Source src = resolve(source);
             string dbname = getDBName(src);
 
             check("OCILogon", OCILogon(
                         db_.data_.env,
-                        db_.data_.error,
+                        error,
                         &svc_ctx,
                         cast(const OraText*) src.username.ptr,
                         cast(ub4) src.username.length,
@@ -114,7 +116,7 @@ struct Connection {
         }
 
         ~this() {
-            if (svc_ctx) check("OCILogoff", OCILogoff(svc_ctx, db.data_.error));
+            if (svc_ctx) check("OCILogoff", OCILogoff(svc_ctx, error));
         }
 
         this(this) { assert(false); }
@@ -239,6 +241,7 @@ struct Statement {
     struct Payload {
         Connection con;
         string sql;
+        OCIError *error;
         OCIStmt *stmt;
         ub2 stmt_type;
         bool hasRows;
@@ -248,6 +251,7 @@ struct Statement {
         this(Connection con_, string sql_) {
             con = con_;
             sql = sql_;
+            error = con.data_.error;
 
             check("OCIHandleAlloc", OCIHandleAlloc(
                         con.data_.db.data_.env,
@@ -280,7 +284,7 @@ struct Statement {
 
         check("OCIStmtPrepare", OCIStmtPrepare(
                     data_.stmt,
-                    data_.con.data_.db.data_.error,
+                    data_.error,
                     cast(OraText*) data_.sql.ptr,
                     cast(ub4) data_.sql.length,
                     OCI_NTV_SYNTAX,
@@ -294,7 +298,7 @@ struct Statement {
                     &data_.stmt_type,
                     null,
                     OCI_ATTR_STMT_TYPE,
-                    data_.con.data_.db.data_.error));
+                    data_.error));
 
         check("OCIAttrGet", OCIAttrGet(
                     data_.stmt,
@@ -302,7 +306,7 @@ struct Statement {
                     &data_.binds,
                     null,
                     OCI_ATTR_BIND_COUNT,
-                    data_.con.data_.db.data_.error));
+                    data_.error));
 
         log("binds: ", data_.binds);
     }
@@ -315,7 +319,7 @@ struct Statement {
         check("OCIStmtExecute", OCIStmtExecute(
                     data_.con.data_.svc_ctx,
                     data_.stmt,
-                    data_.con.data_.db.data_.error,
+                    data_.error,
                     iters,
                     0,
                     null,
@@ -366,7 +370,7 @@ struct Result {
 
         this(Statement stmt_) {
             stmt = stmt_;
-            error = stmt.data_.con.data_.db.data_.error;
+            error = stmt.data_.error;
             build_describe();
             build_bind();
             next();
@@ -386,7 +390,7 @@ struct Result {
                         &numcols,
                         null,
                         OCI_ATTR_PARAM_COUNT,
-                        stmt.data_.con.data_.db.data_.error));
+                        error));
             columns = numcols;
             log("columns: ", columns);
 
@@ -399,7 +403,7 @@ struct Result {
                 check("OCIParamGet",OCIParamGet(
                             stmt.data_.stmt,
                             OCI_HTYPE_STMT,
-                            stmt.data_.con.data_.db.data_.error,
+                            error,
                             cast(void**) &col,
                             i+1));
 
@@ -470,7 +474,7 @@ struct Result {
             //log("OCIStmtFetch2");
             status = OCIStmtFetch2(
                     stmt.data_.stmt,
-                    stmt.data_.con.data_.db.data_.error,
+                    error,
                     row_array_size,
                     OCI_FETCH_NEXT,
                     0,
