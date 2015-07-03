@@ -8,6 +8,7 @@ import std.typecons;
 import etc.c.sqlite3;
 
 import std.database.exception;
+import std.database.resolver;
 
 import std.stdio;
 
@@ -25,8 +26,8 @@ struct Database {
 
     Connection connection() {
         version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
-        if (!data_.defaultURI.length) throw new DatabaseException("no default URI");
-        return Connection(this, data_.defaultURI);
+        if (!data_.defaultSource.length) throw new DatabaseException("no default URI");
+        return Connection(this, data_.defaultSource);
     } 
 
     Connection connection(string url) {
@@ -34,26 +35,24 @@ struct Database {
         return Connection(this, url);
     } 
 
-    string defaultURI() {
+    // properties? 
+
+    string defaultSource() {
         version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
-        return data_.defaultURI;
+        return data_.defaultSource;
     }
 
-    this(string defaultURI) {
-        data_ = Data(defaultURI);
+    this(string defaultSource) {
+        data_ = Data(defaultSource);
     }
-
-    // properties?
-    string defaultURI() {return data_.defaultURI;}
-    void defaultURI(string defaultURI) {data_.defaultURI = defaultURI;}
 
     private:
 
     struct Payload {
-        string defaultURI;
+        string defaultSource;
 
-        this(string defaultURI_) {
-            defaultURI = defaultURI_;
+        this(string defaultSource_) {
+            defaultSource = defaultSource_;
         }
         this(this) { assert(false); }
         void opAssign(Database.Payload rhs) { assert(false); }
@@ -71,10 +70,15 @@ struct Connection {
         string filename;
         sqlite3* sq;
 
-        this(Database* db_, string filename_) {
+        this(Database* db_, string source) {
             db = db_;
-            filename = filename_;
-            writeln("sqlite opening ", filename);
+
+            // map server to filename while resolution rules are refined
+            Source src = resolve(source);
+            filename = src.server;
+
+            writeln("sqlite opening file: ", filename);
+
             int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
             int rc = sqlite3_open_v2(toStringz(filename), &sq, flags, null);
             if (rc) {

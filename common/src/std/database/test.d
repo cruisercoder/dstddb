@@ -8,6 +8,7 @@ void testAll(Database) (Database db) {
     bindTest(db);    
     bindInsertTest(db);    
     cascadeTest(db);    
+    connectionWithSourceTest(db);
     polyTest!Database();    
 }
 
@@ -52,12 +53,17 @@ void cascadeTest(Database) (Database db) {
     writeln();
     writeln("cascade write_result test");
     db
-        .connection("test.sqlite")
+        .connection()
         .statement("select * from t1")
         .range()
         .write_result();
     writeln();
 } 
+
+void connectionWithSourceTest(Database) (Database db) {
+    auto con = db.connection(db.defaultSource());
+} 
+
 
 void polyTest(DB) () {
     // careful to distinguiush DB from imported Database type
