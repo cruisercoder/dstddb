@@ -2,6 +2,7 @@ module std.database.odbc.database;
 pragma(lib, "odbc");
 
 public import std.database.exception;
+public import std.database.resolver;
 import std.database.odbc.sql;
 import std.database.odbc.sqltypes;
 import std.database.odbc.sqlext;
@@ -109,28 +110,26 @@ struct Connection {
             db = db_;
             source = source_;
 
+            log("ODBC opening: ", source);
+
             char[1024] outstr;
             SQLSMALLINT outstrlen;
-            string DSN = "DSN=testdb";
+            //string DSN = "DSN=testdb";
 
-            log("ODBC opening: ", source);
+            Source src = resolve(source);
 
             SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC,db.data_.env,&con);
             if ((ret != SQL_SUCCESS) && (ret != SQL_SUCCESS_WITH_INFO)) {
                 throw new DatabaseException("SQLAllocHandle error: " ~ to!string(ret));
             }
 
-            string server = source;
-            string un = "";
-            string pw = "";
-
             check("SQLConnect", SQL_HANDLE_DBC, con, SQLConnect(
                         con,
-                        cast(SQLCHAR*) toStringz(server),
+                        cast(SQLCHAR*) toStringz(src.server),
                         SQL_NTS,
-                        cast(SQLCHAR*) toStringz(un),
+                        cast(SQLCHAR*) toStringz(src.username),
                         SQL_NTS,
-                        cast(SQLCHAR*) toStringz(pw),
+                        cast(SQLCHAR*) toStringz(src.password),
                         SQL_NTS));
             connected = true;
         }

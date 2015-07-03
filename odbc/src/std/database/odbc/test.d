@@ -7,7 +7,7 @@ unittest {
     auto db = Database.create("uri");
     db.showDrivers();
 
-    auto con = Connection(db,"testdb");
+    auto con = Connection(db,"odbc");
     //auto stmt = Statement(con, "select name,score from score");
     auto stmt = Statement(
             con,
