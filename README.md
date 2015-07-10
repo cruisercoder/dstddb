@@ -80,19 +80,53 @@ Database.register!(std.database.oracle.Database)();
 auto db = Database.create("mydb");
 ```
 
-## Quickstart (OSX, homebrew)
+## Quickstart
+
+For OSX, you can install a number of dependencies easily
 ```bash
 brew install dmd,dub,sqlite,mysql
 https://github.com/cruisercoder/ddb
-cd ddb
-dub
+```
+The sqlite, mysql, oracle, and odbc drivers are working to varying degrees. The poly driver is not. This means you will need to specify one of the reference drivers directly in your import:
+```D
+import std.database.mysql;
+```
+
+You will need a configuration file to define sources.  This is a work in progress, but this is the current mode. Add the following to $HOME/db.json:
+
+```json
+{
+    "databases": [
+         {
+            "name": "mysql",
+            "type": "mysql",
+            "server": "127.0.0.1",
+            "database": "database",
+            "username": "username",
+            "password": "password"
+        },
+    ] 
+}
+```
+
+Here's an example for mysql:
+```D
+import std.database.mysql;
+auto db = Database.create("mysql");
+auto con = db.connection("mysql");
+auto stmt = con.statement("select * from my_table where name = 'joe'");
+auto res = con.result();
+foreach(Result.Range.Row row; res.range()) {
+    writeln("row: ", row[0].chars());
+}
 ```
 
 ## Status
 
-| Feature                 | sqlite | mysql  | oracle | odbc  |
-| :---------------------- | :----- | :----- | :----- | :---- |
-| simple sql select       | y      |        |        |       |
+| Feature                 | sqlite | mysql  | oracle | odbc  | poly  |
+| :---------------------- | :----- | :----- | :----- | :---- | :---- |
+| simple sql select       | y      | y      | y      | y     |       |
+| input binding (string)  | y      | y      | y      |       |       |
 
 
 ## Implementation Notes
