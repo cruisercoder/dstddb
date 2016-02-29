@@ -15,11 +15,11 @@ import std.stdio;
 
 struct DefaultPolicy {}
 
-auto database()(string defaultURI="") {
+auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-auto database(T)(string defaultURI="") {
+auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
@@ -83,27 +83,27 @@ struct Connection(T) {
 
     private struct Payload {
         Database!T* db;
-        string filename;
+        string path;
         sqlite3* sq;
 
         this(Database!T* db_, string source) {
             db = db_;
 
-            // map server to filename while resolution rules are refined
+            // map server to path while resolution rules are refined
             Source src = resolve(source);
-            filename = src.server;
+            path = src.path.length != 0 ? src.path : src.server; // fix
 
-            writeln("sqlite opening file: ", filename);
+            writeln("sqlite opening file: ", path);
 
             int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
-            int rc = sqlite3_open_v2(toStringz(filename), &sq, flags, null);
+            int rc = sqlite3_open_v2(toStringz(path), &sq, flags, null);
             if (rc) {
                 writeln("error: rc: ", rc, sqlite3_errmsg(sq));
             }
         }
 
         ~this() {
-            writeln("sqlite closing ", filename);
+            writeln("sqlite closing ", path);
             if (sq) {
                 int rc = sqlite3_close(sq);
                 sq = null;

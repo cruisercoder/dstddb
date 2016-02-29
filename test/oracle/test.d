@@ -7,6 +7,18 @@ unittest {
     alias DB = Database!DefaultPolicy;
     testAll!DB("oracle");
 
+    //auto database1 = Database!()();
+    //auto database2 = Database!()("oracle");
+
+    auto database3 = createDatabase();
+    auto database4 = std.database.oracle.createDatabase();
+
+    //auto database = Database!DefaultPolicy.create("oracle");
+    //auto database = Database.create("oracle");
+
+    //auto database = database("oracle");
+    //auto con = database.connection();
+
     /*
     auto db = database("oracle");
     auto con = db.connection();

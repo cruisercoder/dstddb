@@ -23,8 +23,8 @@ alias SQLUINTEGER SQLULEN;
 
 struct DefaultPolicy {}
 
-auto database()(string defaultURI="") {
-    return Database!int(defaultURI);  
+auto createDatabase()(string defaultURI="") {
+    return Database!DefaultPolicy(defaultURI);  
 }
 
 

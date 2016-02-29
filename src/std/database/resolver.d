@@ -1,6 +1,7 @@
 module std.database.resolver;
 
 import std.database.exception;
+import std.database.uri;
 
 import std.process;
 import std.file;
@@ -9,10 +10,12 @@ import std.path;
 import std.json;
 import std.conv;
 import std.stdio;
+import std.string;
 
 struct Source {
     string type;
     string server;
+    string path; // for file references (sqlite)
     string database;
     string username;
     string password;
@@ -20,8 +23,20 @@ struct Source {
 
 Source resolve(string name) {
     Source source;
+
+    // first, hacky url check
+    if (name.indexOf('/') != -1) {
+        URI uri = toURI(name);
+        source.type = uri.protocol; 
+        source.server = uri.host;
+        source.path = uri.path.startsWith('/') ? uri.path[1..$] : uri.path;
+        source.database = source.path; 
+        source.username = uri["username"];
+        source.password = uri["password"];
+        return source;
+    }
+
     auto home = environment["HOME"];
-    writeln("HOME: ", home);
 
     string file = home ~ "/db.json";
     auto bytes = read(file);
@@ -33,6 +48,7 @@ Source resolve(string name) {
         if (e["name"].str != name) continue;
         source.type = e["type"].str;
         source.server = e["server"].str;
+        //source.path = e["path"].str; // fix
         source.database = e["database"].str;
         source.username = e["username"].str;
         source.password = e["password"].str;

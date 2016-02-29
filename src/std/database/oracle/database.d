@@ -17,6 +17,7 @@ import std.typecons;
 
 struct DefaultPolicy {}
 
+/*
 template Info(T:Database!T) {
     alias Connection = .Connection!T;
 }
@@ -25,12 +26,13 @@ template Info(T:Connection!T) {
     alias Database = .Database!T;
     alias Statement = .Statement!T;
 }
+*/
 
-auto database()(string defaultURI="") {
+auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-auto database(T)(string defaultURI="") {
+auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
@@ -51,8 +53,14 @@ void check(string msg, sword status) {
     throw new DatabaseException("OCI error: " ~ msg);
 }
 
-struct Database(T) {
+//struct Database() {
+    //static auto create()(string uri="") {return Database!DefaultPolicy();}
+//}
+
+struct Database(T=DefaultPolicy) {
     //alias Connection = .Connection!T;
+
+    static auto create()(string uri="") {return Database!DefaultPolicy();}
 
     // temporary
     auto connection() {return Connection!T(this);}
@@ -108,7 +116,7 @@ struct Database(T) {
     //data_ = Data("");
     //}
 
-    this(string defaultURI) {
+    this(string defaultURI="") {
         data_ = Data(defaultURI);
     }
 }

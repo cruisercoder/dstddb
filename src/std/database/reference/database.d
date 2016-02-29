@@ -1,4 +1,4 @@
-module std.database.mock.database;
+module std.database.reference.database;
 
 import std.string;
 
@@ -9,14 +9,16 @@ import std.experimental.logger;
 import std.stdio;
 import std.typecons;
 
+struct DefaultPolicy {}
+
 // this function is module specific because it allows 
 // a default template to be specified
-auto database()(string defaultUrl=null) {
+auto createDatabase()(string defaultUrl=null) {
     return Database!int.create(defaultUrl);  
 }
 
 //one for specfic type
-auto database(T)(string defaultUrl=null) {
+auto createDatabase(T)(string defaultUrl=null) {
     return Database!T.create(defaultUrl);  
 }
 
@@ -49,12 +51,12 @@ struct Database(T) {
         string defaultURI;
 
         this(string defaultURI_) {
-            writeln("mock: opening database resource");
+            writeln("opening database resource");
             defaultURI = defaultURI_;
         }
 
         ~this() {
-            writeln("mock: closing database resource");
+            writeln("closing database resource");
         }
 
         this(this) { assert(false); }

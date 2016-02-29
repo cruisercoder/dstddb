@@ -28,7 +28,7 @@ void simpleInsertSelect(D) (D db) {
     log("simpleInsertSelect");
     create_score_table(db, "score");
     db.execute("insert into score values('Person',123)");
-    writeResultRange(db.connection().statement("select * from score").range());
+    writeResult(db.connection().statement("select * from score"));
 }
 
 void classicSelect(Database) (Database db) {
@@ -38,7 +38,7 @@ void classicSelect(Database) (Database db) {
     auto con = db.connection();
     auto stmt = con.statement("select * from " ~ table);
     auto range = stmt.range();
-    writeResultRange(range);
+    writeResult(range);
 }
 
 void bindTest(Database) (Database db) {
@@ -55,7 +55,7 @@ void bindTest(Database) (Database db) {
     assert(stmt.binds() == 2);
     auto res = stmt.result();
     assert(res.columns() == 2);
-    writeResultRange(res.range());
+    writeResult(res.range());
 }
 
 void bindInsertTest(Database) (Database db) {
@@ -71,7 +71,7 @@ void bindInsertTest(Database) (Database db) {
     stmt.execute("a",1);
     stmt.execute("b",2);
     stmt.execute("c",3);
-    con.statement("select * from score").range().writeResultRange();
+    con.statement("select * from score").writeResult();
 }
 
 void cascadeTest(Database) (Database db) {
@@ -80,8 +80,7 @@ void cascadeTest(Database) (Database db) {
     db
         .connection()
         .statement("select * from t1")
-        .range()
-        .writeResultRange();
+        .writeResult();
     writeln();
 } 
 

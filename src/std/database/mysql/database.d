@@ -23,11 +23,11 @@ import std.typecons;
 
 struct DefaultPolicy {}
 
-auto database()(string defaultURI="") {
+auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-auto database(T)(string defaultURI="") {
+auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
