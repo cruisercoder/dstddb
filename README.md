@@ -13,6 +13,7 @@ DUB link:  coming soon
 - Support a for [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style interface
 - URL style connection strings
 - Reference implementations so far: mysql, sqlite, oracle, and ODBC
+- Support for allocators
 - Support for runtime driver registration
 - Input variable binding support
 - Array input/output binding support

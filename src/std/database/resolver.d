@@ -22,6 +22,8 @@ struct Source {
 }
 
 Source resolve(string name) {
+    if (name.length == 0) throw new DatabaseException("resolver: name empty");
+
     Source source;
 
     // first, hacky url check

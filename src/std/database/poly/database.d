@@ -29,18 +29,28 @@ struct Database {
     }
 
     this(string defaultURI) {
-        foreach(ref d; databases) {
-            d.data = d.dispatch.create(defaultURI);
-        }
-    }
-
-    ~this() {
-        foreach(ref d; databases) {
-            d.dispatch.destroy(d.data);
-        }
+        data_ = Data(defaultURI);
     }
 
     // private
+
+    private struct Payload {
+        string defaultURI;
+        this(string defaultURI_) {
+            defaultURI = defaultURI_;
+            foreach(ref d; databases) {
+                d.data = d.dispatch.create(defaultURI);
+            }
+        }
+        ~this() {
+            foreach(ref d; databases) {
+                d.dispatch.destroy(d.data);
+            }
+        }
+    }
+
+    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
+    private Data data_;
 
     private struct Dispatch {
         void* function(string defaultURI) create;

@@ -60,7 +60,13 @@ void check(string msg, sword status) {
 struct Database(T=DefaultPolicy) {
     //alias Connection = .Connection!T;
 
-    static auto create()(string uri="") {return Database!DefaultPolicy();}
+    //this() {
+    //data_ = Data("");
+    //}
+
+    this(string defaultURI="") {
+        data_ = Data(defaultURI);
+    }
 
     // temporary
     auto connection() {return Connection!T(this);}
@@ -112,13 +118,6 @@ struct Database(T=DefaultPolicy) {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-    //this() {
-    //data_ = Data("");
-    //}
-
-    this(string defaultURI="") {
-        data_ = Data(defaultURI);
-    }
 }
 
 struct Connection(T) {

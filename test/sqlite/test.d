@@ -14,9 +14,9 @@ unittest {
 }
 
 unittest {
-    auto db = createDatabase("path:///testdb");
-    auto con = db.connection();
-    con.statement("select * from score").writeResult();
+    //auto db = createDatabase("path:///testdb");
+    //auto con = db.connection();
+    //con.statement("select * from score").writeResult();
 }
 
 

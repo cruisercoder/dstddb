@@ -9,6 +9,7 @@ import etc.c.sqlite3;
 
 import std.database.exception;
 import std.database.resolver;
+public import std.database.pool;
 import std.experimental.logger;
 
 import std.stdio;
@@ -35,11 +36,21 @@ auto result(T)(Statement!T stmt) {
 struct Database(T) {
     //alias Connection = .Connection;
     //alias Statement = .Statement;
+    //alias PoolType = Pool!(Database!T,Connection!T);
+    //PoolType pool_;
+
+    this(string defaultSource) {
+        data_ = Data(defaultSource);
+        //pool_ = PoolType(this);
+        //log("Database: defaultSource: ", data_.defaultSource);
+    }
 
     // temporary helper functions
-    auto connection() {return Connection!T(this, data_.defaultSource);}
-    auto connection(string url) {return Connection!T(this, url);}
+    //auto connection(string uri) {return pool_.get(uri);}
+    auto connection(string url="") {return Connection!T(this, url);}
+    //auto connection() {return pool_.get();}
     auto execute(string sql) {this.connection().execute(sql);}
+
 
     bool bindable() {return true;}
 
@@ -48,10 +59,6 @@ struct Database(T) {
     string defaultSource() {
         version (assert) if (!data_.refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
         return data_.defaultSource;
-    }
-
-    this(string defaultSource) {
-        data_ = Data(defaultSource);
     }
 
     private:
@@ -86,11 +93,13 @@ struct Connection(T) {
         string path;
         sqlite3* sq;
 
-        this(Database!T* db_, string source) {
+        this(Database!T* db_, string source_) {
             db = db_;
 
-            // map server to path while resolution rules are refined
+            auto source = source_.length == 0 ? db.data_.defaultSource : source_;
             Source src = resolve(source);
+
+            // map server to path while resolution rules are refined
             path = src.path.length != 0 ? src.path : src.server; // fix
 
             writeln("sqlite opening file: ", path);
