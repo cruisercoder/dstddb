@@ -45,7 +45,7 @@ foreach (row; range) {
 #### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style select
 ```D
 import std.database.sqlite;
-createDatabase("file:///demo.sqlite");
+createDatabase("file:///demo.sqlite")
     .connection()
     .statement("select * from t1")
     .range()
