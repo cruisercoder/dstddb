@@ -5,16 +5,21 @@ import std.string;
 public import std.database.exception;
 import std.container.array;
 import std.experimental.logger;
+import std.experimental.allocator.mallocator;
+
+public import std.database.allocator;
 
 import std.stdio;
 import std.typecons;
 
-struct DefaultPolicy {}
+struct DefaultPolicy {
+    alias Allocator = MyMallocator;
+}
 
 // this function is module specific because it allows 
 // a default template to be specified
 auto createDatabase()(string defaultUrl=null) {
-    return Database!int.create(defaultUrl);  
+    return Database!DefaultPolicy.create(defaultUrl);  
 }
 
 //one for specfic type
@@ -41,6 +46,7 @@ auto result(T)(Statement!T stmt) {
 }
 
 struct Database(T) {
+    alias Allocator = T.Allocator;
 
     static Database create(string defaultURI) {
         //abc();
@@ -49,10 +55,12 @@ struct Database(T) {
 
     private struct Payload {
         string defaultURI;
+        Allocator allocator;
 
         this(string defaultURI_) {
             writeln("opening database resource");
             defaultURI = defaultURI_;
+            allocator = Allocator();
         }
 
         ~this() {
@@ -182,7 +190,7 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    ResultRange range() {return ResultRange(this);}
+    auto opSlice() {return ResultRange(this);}
 
     bool start() {return true;}
     bool next() {return data_.next();}
@@ -211,7 +219,14 @@ struct Result(T) {
 }
 
 struct Value {
-    int get(T) () { return 0; }
+    auto as(T:int)() {
+        return 0;
+    }
+
+    auto as(T:string)() {
+        return "value";
+    }
+
     auto chars() {return "value";}
 }
 

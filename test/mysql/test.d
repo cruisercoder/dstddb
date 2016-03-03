@@ -9,11 +9,10 @@ unittest {
     testAll!DB("mysql");
 }
 
-/*
 unittest {
     auto db = createDatabase("mysql://127.0.0.1/test");
     auto con = db.connection();
-    con.statement("select * from score").writeResult();
+    con.statement("select * from score")[].writeResult();
 }
-*/
+
 

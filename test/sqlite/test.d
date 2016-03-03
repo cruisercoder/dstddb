@@ -14,9 +14,13 @@ unittest {
 }
 
 unittest {
-    //auto db = createDatabase("path:///testdb");
-    //auto con = db.connection();
+    auto db = createDatabase("path:///testdb");
+    auto con = db.connection();
     //con.statement("select * from score").writeResult();
+    auto range = con.statement("select name,score from score")[];
+    foreach (r; range) {
+        writeln(r[0].as!string,",",r[1].as!int);
+    }
 }
 
 

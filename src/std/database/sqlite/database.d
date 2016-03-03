@@ -1,4 +1,5 @@
 module std.database.sqlite.database;
+import std.experimental.allocator.mallocator;
 
 pragma(lib, "sqlite3");
 
@@ -9,12 +10,15 @@ import etc.c.sqlite3;
 
 import std.database.exception;
 import std.database.resolver;
-public import std.database.pool;
+import std.database.allocator;
+import std.database.pool;
 import std.experimental.logger;
 
 import std.stdio;
 
-struct DefaultPolicy {}
+struct DefaultPolicy {
+    alias Allocator = MyMallocator;
+}
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -34,6 +38,7 @@ auto result(T)(Statement!T stmt) {
 
 
 struct Database(T) {
+    alias Allocator = T.Allocator;
     //alias Connection = .Connection;
     //alias Statement = .Statement;
     //alias PoolType = Pool!(Database!T,Connection!T);
@@ -67,6 +72,7 @@ struct Database(T) {
         string defaultSource;
 
         this(string defaultSource_) {
+            Allocator allocator;
             defaultSource = defaultSource_;
         }
         this(this) { assert(false); }
@@ -132,12 +138,13 @@ struct Connection(T) {
 }
 
 struct Statement(T) {
+    alias Allocator = T.Allocator;
     //alias Result = .Result!T;
     //alias Range = .ResultRange!T;
 
     // temporary
     auto result() {return Result!T(this);}
-    auto range() {return result().range();}
+    auto opSlice() {return result().opSlice();}
 
     void error(string msg, int ret) {data_.con.error(msg, ret);}
 
@@ -305,7 +312,7 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    auto range() {return ResultRange!T(this);}
+    auto opSlice() {return ResultRange!T(this);}
 
     public bool start() {return data_.stmt_.hasRows();}
     public bool next() {return data_.next();}
@@ -324,19 +331,15 @@ struct Value(T) {
         idx_ = idx;
     }
 
-    int get(T) () {
-        return toInt();
-    }
-
-    // bounds check or covered?
-    int toInt() {
+    auto as(T:int)() {
+        // bounds check or covered?
         return sqlite3_column_int(result_.data_.st_, cast(int) idx_);
     }
 
-    // not efficient
-    string toString() {
-        import std.conv;
-        return to!string(sqlite3_column_text(result_.data_.st_, cast(int) idx_));
+    auto as(T:string)() {
+        import core.stdc.string: strlen;
+        auto ptr = cast(immutable char*) sqlite3_column_text(result_.data_.st_, cast(int) idx_);
+        return cast(string) ptr[0..strlen(ptr)]; // fix with length
     }
 
     auto chars() {

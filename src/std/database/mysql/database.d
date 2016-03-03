@@ -46,11 +46,12 @@ struct Database(T) {
     bool bindable() {return true;}
 
     private struct Payload {
-        Allocator allocator;
         string defaultURI;
+        Allocator allocator;
+
         this(string defaultURI_) {
             defaultURI = defaultURI_;
-            allocator = MyMallocator();
+            allocator = Allocator();
         }
     }
 
@@ -177,7 +178,7 @@ struct Statement(T) {
 
     // temporary
     auto result() {return Result!T(this);}
-    auto range() {return result().range();} // no size error
+    auto opSlice() {return result().opSlice();}
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
@@ -259,8 +260,8 @@ struct Statement(T) {
 
     struct Payload {
         Connection!T con;
-        Allocator *allocator;
         string sql;
+        Allocator *allocator;
         MYSQL_STMT *stmt;
         bool hasRows;
         uint binds;
@@ -372,7 +373,9 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    ResultRange!T range() {return ResultRange!T(this);}
+    auto opSlice() {return ResultRange!T(this);}
+
+package:
 
     bool start() {return data_.status == 0;}
     bool next() {return data_.next();}
@@ -489,14 +492,18 @@ struct Value(T) {
         mysqlBind_ = mysqlBind;
     }
 
-    int get(X) () {
-        return toInt();
-    }
-
-    int toInt() {
+    auto as(X:int)() {
+        if (mysqlBind_.buffer_type == MYSQL_TYPE_STRING) return to!int(as!string()); // tmp hack
         check(mysqlBind_.buffer_type, MYSQL_TYPE_LONG);
         return *cast(int*) mysqlBind_.buffer;
         //return *(cast(int*) bind_.bind.buffer);
+    }
+
+    auto as(X:string)() {
+        import core.stdc.string: strlen;
+        check(mysqlBind_.buffer_type, MYSQL_TYPE_STRING);
+        auto ptr = cast(immutable char*) mysqlBind_.buffer;
+        return cast(string) ptr[0..strlen(ptr)]; // fix with length
     }
 
     //inout(char)[]
@@ -510,6 +517,7 @@ struct Value(T) {
     private:
 
     void check(int a, int b) {
+        log(a, ":", b);
         if (a != b) throw new DatabaseException("type mismatch");
     }
 

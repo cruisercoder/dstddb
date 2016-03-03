@@ -12,6 +12,8 @@ void testAll(Database) (string source) {
     simpleInsertSelect(db);    
     classicSelect(db);    
 
+    fieldAccess(db);     // hold for now
+
     bindTest1(db);
     bindTest2(db);
 
@@ -35,13 +37,26 @@ void simpleInsertSelect(D) (D db) {
 }
 
 void classicSelect(Database) (Database db) {
-    // classic non-fluent style
+    // classic non-fluent style with inline iteration
     string table = "t1";
     create_score_table(db, table);
     auto con = db.connection();
     auto stmt = con.statement("select * from " ~ table);
-    auto range = stmt.range();
-    writeResult(range);
+    auto range = stmt[];
+    foreach (r; range) {
+        for(size_t c = 0; c != r.columns; ++c) {
+            if (c) write(",");
+            write("", r[c].chars()); // why fail when not .chars()?
+        }
+        writeln();
+    }
+}
+
+void fieldAccess(Database)(Database db) {
+    auto range = db.connection().statement("select name,score from score")[];
+    foreach (r; range) {
+        writeln(r[0].as!string,",",r[1].as!int);
+    }
 }
 
 void bindTest1(Database) (Database db) {
@@ -55,7 +70,7 @@ void bindTest1(Database) (Database db) {
     assert(stmt.binds() == 1);
     auto res = stmt.result();
     assert(res.columns() == 2);
-    writeResult(res.range());
+    writeResult(res[]);
 }
 
 void bindTest2(Database) (Database db) {
@@ -72,7 +87,7 @@ void bindTest2(Database) (Database db) {
     assert(stmt.binds() == 2);
     auto res = stmt.result();
     assert(res.columns() == 2);
-    writeResult(res.range());
+    writeResult(res[]);
 }
 
 void bindInsertTest(Database) (Database db) {

@@ -19,15 +19,8 @@ unittest {
     auto stmt = statement(con, "select * from t");
     auto res = stmt.result();
 
-    auto range = res.range();
+    auto range = res[];
 
-    writeResult(res);
-    writeResultRange(range);
-
-    // cant easily name row type
-    //foreach(Range.Row row; range) {
-        //writeln("row: ", row[0].chars());
-    //}
-
+    writeResult(range);
 }
 

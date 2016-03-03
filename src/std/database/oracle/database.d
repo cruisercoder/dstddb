@@ -5,28 +5,21 @@ pragma(lib, "clintsh");
 import std.string;
 import core.stdc.stdlib;
 import std.conv;
+import std.experimental.allocator.mallocator;
 
 public import std.database.oracle.bindings;
 public import std.database.exception;
 public import std.database.resolver;
+public import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
 
 import std.stdio;
 import std.typecons;
 
-struct DefaultPolicy {}
-
-/*
-template Info(T:Database!T) {
-    alias Connection = .Connection!T;
+struct DefaultPolicy {
+    alias Allocator = MyMallocator;
 }
-
-template Info(T:Connection!T) {
-    alias Database = .Database!T;
-    alias Statement = .Statement!T;
-}
-*/
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -58,6 +51,7 @@ void check(string msg, sword status) {
 //}
 
 struct Database(T=DefaultPolicy) {
+    alias Allocator = T.Allocator;
     //alias Connection = .Connection!T;
 
     //this() {
@@ -76,11 +70,13 @@ struct Database(T=DefaultPolicy) {
     bool bindable() {return false;}
 
     private struct Payload {
+        Allocator allocator;
         string defaultURI;
         OCIEnv* env;
         OCIError *error;
 
         this(string defaultURI_) {
+            allocator = Allocator();
             defaultURI = defaultURI_;
             writeln("oracle: opening database");
             ub4 mode = OCI_THREADED | OCI_OBJECT;
@@ -215,6 +211,7 @@ struct Bind {
 //auto range(T)(Statement!T stmt) {return Result!T(stmt).range();}
 
 struct Statement(T) {
+    alias Allocator = T.Allocator;
     //alias Connection = .Connection!T;
     //alias Result = .Result;
     //alias Range = Result.Range;
@@ -223,7 +220,7 @@ struct Statement(T) {
 
     // temporary
     auto result() {return Result!T(this);}
-    auto range() {return Result!T(this).range();} // no size error
+    auto opSlice() {return Result!T(this).opSlice();} // no size error
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
@@ -300,6 +297,7 @@ struct Statement(T) {
     struct Payload {
         Connection!T con;
         string sql;
+        Allocator *allocator;
         OCIError *error;
         OCIStmt *stmt;
         ub2 stmt_type;
@@ -310,6 +308,7 @@ struct Statement(T) {
         this(Connection!T con_, string sql_) {
             con = con_;
             sql = sql_;
+            allocator = &con.data_.db.data_.allocator;
             error = con.data_.error;
 
             check("OCIHandleAlloc", OCIHandleAlloc(
@@ -322,7 +321,7 @@ struct Statement(T) {
 
         ~this() {
             for(int i = 0; i < inputBind.length; ++i) {
-                free(inputBind[i].data);
+                allocator.deallocate(inputBind[i].data[0..inputBind[i].allocSize]);
             }
             if (stmt) check("OCIHandleFree", OCIHandleFree(stmt,OCI_HTYPE_STMT));
             // stmt = null? needed
@@ -407,6 +406,7 @@ struct Statement(T) {
 }
 
 struct Result(T) {
+    alias Allocator = T.Allocator;
     //alias Statement = .Statement!T;
     //alias ResultRange = .ResultRange!T;
     alias Range = ResultRange;
@@ -418,7 +418,7 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    auto range() {return ResultRange!T(this);}
+    auto opSlice() {return ResultRange!T(this);}
 
     bool start() {return data_.status == OCI_SUCCESS;}
     bool next() {return data_.next();}
@@ -429,6 +429,7 @@ struct Result(T) {
 
     struct Payload {
         Statement!T stmt;
+        Allocator *allocator;
         OCIError *error;
         int columns;
         Array!Describe describe;
@@ -438,6 +439,7 @@ struct Result(T) {
 
         this(Statement!T stmt_) {
             stmt = stmt_;
+            allocator = &stmt.data_.con.data_.db.data_.allocator;
             error = stmt.data_.error;
             build_describe();
             build_bind();
@@ -446,7 +448,7 @@ struct Result(T) {
 
         ~this() {
             for(int i = 0; i < bind.length; ++i) {
-                free(bind[i].data);
+                allocator.deallocate(bind[i].data[0..bind[i].allocSize]);
             }
         }
 
@@ -506,7 +508,7 @@ struct Result(T) {
         }
 
         void build_bind() {
-            import core.memory : GC;
+            import core.memory : GC; // needed?
 
             bind.reserve(columns);
 
@@ -516,7 +518,7 @@ struct Result(T) {
                 auto d = &describe[i];
 
                 b.allocSize = cast(sb4) (d.size + 1);
-                b.data = malloc(b.allocSize);
+                b.data = cast(void*)(allocator.allocate(b.allocSize));
                 GC.addRange(b.data, b.allocSize);
 
                 // just str for now
@@ -568,21 +570,24 @@ struct Result(T) {
 
 }
 
-struct Value {
+struct Value(T) {
     package Bind* bind_;
 
     this(Bind* bind) {
         bind_ = bind;
     }
 
-    int get(T) () {
-        return toInt();
-    }
-
-    // bounds check or covered?
-    int toInt() {
+    auto as(X:int)() {
+        if (bind_.type == SQLT_STR) return to!int(as!string()); // tmp hack
         check(bind_.type, SQLT_INT);
         return *(cast(int*) bind_.data);
+    }
+
+    auto as(X:string)() {
+        import core.stdc.string: strlen;
+        check(bind_.type, SQLT_STR);
+        auto ptr = cast(immutable char*) bind_.data;
+        return cast(string) ptr[0..strlen(ptr)]; // fix with length
     }
 
     //inout(char)[]
@@ -637,8 +642,8 @@ struct Row(T) {
 
     int columns() {return result_.columns();}
 
-    Value opIndex(size_t idx) {
-        return Value(&result_.data_.bind[idx]);
+    auto opIndex(size_t idx) {
+        return Value!T(&result_.data_.bind[idx]);
     }
 
     private Result* result_;

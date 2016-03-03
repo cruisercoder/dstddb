@@ -7,6 +7,7 @@ public import std.database.pool;
 import std.database.odbc.sql;
 import std.database.odbc.sqltypes;
 import std.database.odbc.sqlext;
+import std.experimental.allocator.mallocator;
 
 import std.string;
 import std.c.stdlib;
@@ -14,6 +15,7 @@ import std.conv;
 import std.typecons;
 import std.container.array;
 import std.experimental.logger;
+public import std.database.allocator;
 
 //alias long SQLLEN;
 //alias ubyte SQLULEN;
@@ -21,7 +23,9 @@ import std.experimental.logger;
 alias SQLINTEGER SQLLEN;
 alias SQLUINTEGER SQLULEN;
 
-struct DefaultPolicy {}
+struct DefaultPolicy {
+    alias Allocator = MyMallocator;
+}
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -29,6 +33,7 @@ auto createDatabase()(string defaultURI="") {
 
 
 struct Database(T) {
+    alias Allocator = T.Allocator;
     //alias ConnectionPool = Pool!(Connection!T);
 
     // temporary
@@ -85,12 +90,14 @@ struct Database(T) {
 
     struct Payload {
         string defaultURI;
+        Allocator allocator;
         SQLHENV env;
 
         //Connection!T cachedConnection;  // no size error
 
         this(string defaultURI_) {
             defaultURI = defaultURI_;
+            allocator = Allocator();
             check(
                     "SQLAllocHandle", 
                     SQLAllocHandle(
@@ -181,12 +188,13 @@ struct Connection(T) {
 }
 
 struct Statement(T) {
+    alias Allocator = T.Allocator;
     //alias Result = .Result;
     //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
 
     // temporary
     auto result() {return Result!T(this);}
-    auto range() {return result().range();} // no size error
+    auto opSlice() {return result().opSlice();} // no size error
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
@@ -213,7 +221,7 @@ struct Statement(T) {
         b.dbtype = SQL_INTEGER;
         b.size = SQLINTEGER.sizeof;
         b.allocSize = b.size;
-        b.data = malloc(b.allocSize);
+        b.data = cast(void*)(data_.allocator.allocate(b.allocSize));
         inputBind(n, b);
 
         *(cast(SQLINTEGER*) data_.inputBind[n-1].data) = value;
@@ -229,7 +237,7 @@ struct Statement(T) {
         b.dbtype = SQL_CHAR;
         b.size = cast(SQLSMALLINT) value.length;
         b.allocSize = b.size;
-        b.data = malloc(b.allocSize);
+        b.data = cast(void*)(data_.allocator.allocate(b.allocSize));
         inputBind(n, b);
 
         strncpy(cast(char*) b.data, value.ptr, b.size);
@@ -257,6 +265,7 @@ struct Statement(T) {
     struct Payload {
         Connection!T con;
         string sql;
+        Allocator *allocator;
         SQLHSTMT stmt;
         bool hasRows;
         int binds;
@@ -265,12 +274,13 @@ struct Statement(T) {
         this(Connection!T con_, string sql_) {
             con = con_;
             sql = sql_;
+            allocator = &con.data_.db.data_.allocator;
             check("SQLAllocHandle", SQLAllocHandle(SQL_HANDLE_STMT, con.data_.con, &stmt));
         }
 
         ~this() {
             for(int i = 0; i < inputBind.length; ++i) {
-                free(inputBind[i].data);
+                allocator.deallocate(inputBind[i].data[0..inputBind[i].allocSize]);
             }
             if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
             // stmt = null? needed
@@ -367,6 +377,7 @@ struct Bind {
 }
 
 struct Result(T) {
+    alias Allocator = T.Allocator;
     alias Range = .ResultRange!T;
     alias Row = .Row!T;
 
@@ -376,7 +387,7 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    auto range() {return ResultRange!T(this);}
+    auto opSlice() {return ResultRange!T(this);}
 
     bool start() {return data_.status == SQL_SUCCESS;}
     bool next() {return data_.next();}
@@ -387,6 +398,7 @@ struct Result(T) {
 
     struct Payload {
         Statement!T stmt;
+        Allocator *allocator;
         int columns;
         Array!Describe describe;
         Array!Bind bind;
@@ -394,6 +406,7 @@ struct Result(T) {
 
         this(Statement!T stmt_) {
             stmt = stmt_;
+            allocator = stmt.data_.allocator;
             build_describe();
             build_bind();
             next();
@@ -445,7 +458,7 @@ struct Result(T) {
 
                 b.size = d.size;
                 b.allocSize = cast(SQLULEN) (b.size + 1);
-                b.data = malloc(b.allocSize);
+                b.data = cast(void*)(allocator.allocate(b.allocSize));
                 GC.addRange(b.data, b.allocSize);
 
                 // just INT and VARCHAR for now
@@ -506,14 +519,17 @@ struct Value(T) {
         bind_ = bind;
     }
 
-    int get(T) () {
-        return toInt();
-    }
-
-    // bounds check or covered?
-    int toInt() {
+    auto as(T:int)() {
+        if (bind_.type == SQL_C_CHAR) return to!int(as!string()); // tmp hack
         check(bind_.type, SQL_C_LONG);
         return *(cast(int*) bind_.data);
+    }
+
+    auto as(T:string)() {
+        import core.stdc.string: strlen;
+        check(bind_.type, SQL_C_CHAR);
+        auto ptr = cast(immutable char*) bind_.data;
+        return cast(string) ptr[0..strlen(ptr)]; // fix with length
     }
 
     //inout(char)[]
