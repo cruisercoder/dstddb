@@ -2,7 +2,8 @@
 ## A proposed standard database client interface and implementation for the [D](http://dlang.org) Language
 
 Status: early stage project - unstable and minimally tested
-DUB link:  https://code.dlang.org/packages/dstddb
+
+Available in [DUB](https://code.dlang.org/packages/dstddb), the D package registry
 
 ### Roadmap Highlights
 - A database and driver neutral interface specification
