@@ -1,7 +1,7 @@
 module std.database.mysql.database;
 import std.conv;
 import core.stdc.config;
-//import std.experimental.allocator.mallocator;
+import std.experimental.allocator.mallocator;
 
 version(Windows) {
     pragma(lib, "libmysql");
@@ -50,6 +50,7 @@ struct Database(T) {
         string defaultURI;
         this(string defaultURI_) {
             defaultURI = defaultURI_;
+            allocator = MyMallocator();
         }
     }
 
@@ -77,7 +78,7 @@ struct Connection(T) {
         MYSQL *mysql;
 
         this(Database!T db_, string uri_) {
-            db = db;
+            db = db_;
             uri = uri_.length == 0 ? db_.data_.defaultURI : uri_;
 
             mysql = mysql_init(null);
@@ -139,21 +140,17 @@ struct Describe {
 struct Bind {
     int mysql_type;
     int allocSize;
-    MYSQL_BIND *bind;
+    //MYSQL_BIND *bind; //bad
     c_ulong length;
     my_bool is_null;
     my_bool error;
 }
 
-void binder(T)(ref T allocator, int n, ref Bind b, ref MYSQL_BIND mb) {
+void binder(T)(ref T allocator, int n, Bind *b, MYSQL_BIND *mb) {
     import core.stdc.string: memset;
-    b.bind = &mb;
-    memset(&mb, 0, MYSQL_BIND.sizeof);
+    memset(mb, 0, MYSQL_BIND.sizeof);
     mb.buffer_type = b.mysql_type;
 
-    //mb.buffer = malloc(b.allocSize);
-    //alias Allocator = Mallocator;
-    //mb.buffer = cast(void*)(Allocator.instance.allocate(b.allocSize));
     mb.buffer = cast(void*)(allocator.allocate(b.allocSize));
 
     mb.buffer_length = b.allocSize;
@@ -161,10 +158,12 @@ void binder(T)(ref T allocator, int n, ref Bind b, ref MYSQL_BIND mb) {
     mb.is_null = &b.is_null;
     mb.error = &b.error;
 
-    log(
-            "bind: index: ", n,
-            ", type: ", mb.buffer_type,
-            ", allocSize: ", b.allocSize);
+    /*
+       log(
+       "bind: index: ", n,
+       ", type: ", mb.buffer_type,
+       ", allocSize: ", b.allocSize);
+     */
 
     //GC.addRange(b.mb.buffer, allocSize);
 }
@@ -173,6 +172,7 @@ void binder(T)(ref T allocator, int n, ref Bind b, ref MYSQL_BIND mb) {
 //auto range(T)(Statement!T stmt) {return Result!T(stmt).range();}
 
 struct Statement(T) {
+    alias Allocator = T.Allocator;
     //alias Result = .Result;
 
     // temporary
@@ -198,6 +198,7 @@ struct Statement(T) {
 
     void bind(int n, int value) {
         log("input bind: n: ", n, ", value: ", value);
+        if (n==0) throw new DatabaseException("zero index");
 
         {
             Bind b;
@@ -208,9 +209,10 @@ struct Statement(T) {
 
         {
             auto b = &data_.inputBind.back();
+            auto mb = &data_.mysqlBind.back();
             b.is_null = 0;
             b.error = 0;
-            *cast(int*)(b.bind.buffer) = value;
+            *cast(int*)(mb.buffer) = value;
         }
 
     }
@@ -229,10 +231,11 @@ struct Statement(T) {
 
         {
             auto b = &data_.inputBind.back();
+            auto mb = &data_.mysqlBind.back();
             b.is_null = 0;
             b.error = 0;
 
-            auto p = cast(char*) b.bind.buffer;
+            auto p = cast(char*) mb.buffer;
             strncpy(p, value.ptr, value.length);
             p[value.length] = 0;
             b.length = value.length;
@@ -248,13 +251,15 @@ struct Statement(T) {
         data_.inputBind ~= bind;
         data_.mysqlBind ~= MYSQL_BIND();
 
-        //auto allocator = data_.con.data_.db.data_.allocator;
-        binder(data_.allocator, n, data_.inputBind.back(), data_.mysqlBind.back());
+        auto b = &data_.inputBind.back();
+        auto mb = &data_.mysqlBind.back();
+
+        binder(data_.allocator, n, b, mb);
     }
 
     struct Payload {
         Connection!T con;
-        MyMallocator allocator;
+        Allocator *allocator;
         string sql;
         MYSQL_STMT *stmt;
         bool hasRows;
@@ -265,19 +270,18 @@ struct Statement(T) {
 
         this(Connection!T con_, string sql_) {
             con = con_;
-            allocator = MyMallocator();
             sql = sql_;
+            allocator = &con.data_.db.data_.allocator;
+
             stmt = mysql_stmt_init(con.data_.mysql);
-            if (!stmt) {
-                throw new DatabaseException("stmt error");
-            }
+            if (!stmt) throw new DatabaseException("stmt error");
         }
 
         ~this() {
             for(int i = 0; i < mysqlBind.length; ++i) {
-                free(mysqlBind[i].buffer);
-                //allocator.deallocate(mysqlBind[i].buffer);
+                allocator.deallocate(mysqlBind[i].buffer[0..inputBind[i].allocSize]);
             }
+
             if (stmt) mysql_stmt_close(stmt);
             // stmt = null? needed
         }
@@ -296,12 +300,14 @@ struct Statement(T) {
         }
 
         void execute() {
+
             if (inputBind.length && !bindInit) {
                 bindInit = true;
                 check("mysql_stmt_bind_param",
                         stmt,
                         mysql_stmt_bind_param(stmt, &mysqlBind[0]));
             }
+
             check("mysql_stmt_execute", stmt, mysql_stmt_execute(stmt));
         }
 
@@ -356,6 +362,7 @@ struct Statement(T) {
 
 
 struct Result(T) {
+    alias Allocator = T.Allocator;
     //alias Range = .ResultRange!T;
     //alias Row = .Row;
 
@@ -376,7 +383,7 @@ struct Result(T) {
 
     struct Payload {
         Statement!T stmt;
-        MyMallocator allocator;
+        Allocator *allocator;
         uint columns;
         Array!Describe describe;
         Array!Bind bind;
@@ -386,7 +393,7 @@ struct Result(T) {
 
         this(Statement!T stmt_) {
             stmt = stmt_;
-            allocator = MyMallocator();
+            allocator = stmt.data_.allocator;
 
             result_metadata = mysql_stmt_result_metadata(stmt.data_.stmt);
             //columns = mysql_num_fields(result_metadata);
@@ -398,9 +405,9 @@ struct Result(T) {
 
         ~this() {
             for(int i = 0; i < mysqlBind.length; ++i) {
-                free(mysqlBind[i].buffer);
-                //allocator.deallocate(mysqlBind[i].buffer);
+                allocator.deallocate(mysqlBind[i].buffer[0..bind[i].allocSize]);
             }
+
             if (result_metadata) mysql_free_result(result_metadata);
         }
 
@@ -440,12 +447,12 @@ struct Result(T) {
                 bind ~= Bind();
                 auto b = &bind.back();
                 mysqlBind ~= MYSQL_BIND();
+                auto mb = &mysqlBind.back();
 
                 b.allocSize = cast(uint)(d.field.length + 1);
                 b.mysql_type = MYSQL_TYPE_STRING;
 
-                //auto allocator = stmt.data_.con.data_.db.data_.allocator;
-                binder(allocator, i, bind.back(), mysqlBind.back()); //fix
+                binder(allocator, i, b, mb);
             }
 
             mysql_stmt_bind_result(stmt.data_.stmt, &mysqlBind.front());
@@ -475,9 +482,11 @@ struct Result(T) {
 
 struct Value(T) {
     package Bind* bind_;
+    private MYSQL_BIND *mysqlBind_;
 
-    this(Bind* bind) {
+    this(Bind* bind, MYSQL_BIND *mysqlBind) {
         bind_ = bind;
+        mysqlBind_ = mysqlBind;
     }
 
     int get(X) () {
@@ -485,16 +494,17 @@ struct Value(T) {
     }
 
     int toInt() {
-        check(bind_.bind.buffer_type, MYSQL_TYPE_LONG);
-        return *(cast(int*) bind_.bind.buffer);
+        check(mysqlBind_.buffer_type, MYSQL_TYPE_LONG);
+        return *cast(int*) mysqlBind_.buffer;
+        //return *(cast(int*) bind_.bind.buffer);
     }
 
     //inout(char)[]
     auto chars() {
-        check(bind_.bind.buffer_type, MYSQL_TYPE_STRING);
+        check(mysqlBind_.buffer_type, MYSQL_TYPE_STRING);
         import core.stdc.string: strlen;
-        auto data = cast(char*) bind_.bind.buffer;
-        return data ? data[0 .. strlen(data)] : data[0..0];
+        auto d = cast(char*) mysqlBind_.buffer;
+        return d? d[0 .. strlen(d)] : d[0..0]; //fix
     }
 
     private:
@@ -516,7 +526,7 @@ struct Row(T) {
     int columns() {return result_.columns();}
 
     Value opIndex(size_t idx) {
-        return Value(&result_.data_.bind[idx]);
+        return Value(&result_.data_.bind[idx],&result_.data_.mysqlBind[idx]);
     }
 
     private Result* result_;

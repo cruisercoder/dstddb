@@ -1,10 +1,11 @@
 module std.database.allocator;
 import std.experimental.allocator.common;
+import std.experimental.logger;
 
 struct MyMallocator {
     enum uint alignment = platformAlignment;
 
-    @trusted @nogc nothrow
+    @trusted // removed @nogc and nothrow for logging
     void[] allocate(size_t bytes) {
         import core.stdc.stdlib : malloc;
         if (!bytes) return null;
@@ -13,9 +14,10 @@ struct MyMallocator {
     }
 
     /// Ditto
-    @system @nogc nothrow
+    @system // removed @nogc and nothrow for logging
     bool deallocate(void[] b) {
         import core.stdc.stdlib : free;
+        //log("deallocate: ptr: ", b.ptr, "size: ", b.length);
         free(b.ptr);
         return true;
     }

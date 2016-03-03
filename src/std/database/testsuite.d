@@ -11,7 +11,10 @@ void testAll(Database) (string source) {
 
     simpleInsertSelect(db);    
     classicSelect(db);    
-    bindTest(db);    
+
+    bindTest1(db);
+    bindTest2(db);
+
     bindInsertTest(db);    
 
     cascadeTest(db);    
@@ -41,7 +44,21 @@ void classicSelect(Database) (Database db) {
     writeResult(range);
 }
 
-void bindTest(Database) (Database db) {
+void bindTest1(Database) (Database db) {
+    if (!db.bindable()) {
+        writeln("skip bindTest");
+        return;
+    }
+
+    create_score_table(db, "t1");
+    auto stmt = db.connection().statement("select name,score from t1 where score >= ?", 50);
+    assert(stmt.binds() == 1);
+    auto res = stmt.result();
+    assert(res.columns() == 2);
+    writeResult(res.range());
+}
+
+void bindTest2(Database) (Database db) {
     if (!db.bindable()) {
         writeln("skip bindTest");
         return;
