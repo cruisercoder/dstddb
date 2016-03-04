@@ -5,7 +5,6 @@ import std.database.uri;
 
 import std.process;
 import std.file;
-import std.stream;
 import std.path;
 import std.json;
 import std.conv;

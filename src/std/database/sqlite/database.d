@@ -4,7 +4,7 @@ import std.experimental.allocator.mallocator;
 pragma(lib, "sqlite3");
 
 import std.string;
-import std.c.stdlib;
+import core.stdc.stdlib;
 import std.typecons;
 import etc.c.sqlite3;
 

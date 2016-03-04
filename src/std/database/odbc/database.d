@@ -10,7 +10,7 @@ import std.database.odbc.sqlext;
 import std.experimental.allocator.mallocator;
 
 import std.string;
-import std.c.stdlib;
+import core.stdc.stdlib;
 import std.conv;
 import std.typecons;
 import std.container.array;

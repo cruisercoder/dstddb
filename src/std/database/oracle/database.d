@@ -54,11 +54,7 @@ struct Database(T=DefaultPolicy) {
     alias Allocator = T.Allocator;
     //alias Connection = .Connection!T;
 
-    //this() {
-    //data_ = Data("");
-    //}
-
-    this(string defaultURI="") {
+    this(string defaultURI) {
         data_ = Data(defaultURI);
     }
 

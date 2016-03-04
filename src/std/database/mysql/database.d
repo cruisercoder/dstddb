@@ -11,7 +11,7 @@ else {
 }
 
 import std.string;
-import std.c.stdlib;
+import core.stdc.stdlib;
 
 import std.database.mysql.bindings;
 public import std.database.exception;
@@ -493,7 +493,7 @@ struct Value(T) {
     auto as(X:string)() {
         check(bind_.mysql_type, MYSQL_TYPE_STRING);
         auto ptr = cast(immutable char*) bind_.data.ptr;
-        return cast(string) ptr[0..*bind_.length];
+        return cast(string) ptr[0..bind_.length];
     }
 
     //inout(char)[]
