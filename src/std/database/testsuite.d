@@ -9,6 +9,7 @@ void testAll(Database) (string source) {
 
     auto db = Database(source);
 
+    /*
     simpleInsertSelect(db);    
     classicSelect(db);    
 
@@ -16,12 +17,15 @@ void testAll(Database) (string source) {
 
     bindTest1(db);
     bindTest2(db);
+    */
 
     bindInsertTest(db);    
 
+    /*
     cascadeTest(db);    
     connectionWithSourceTest(db);
     polyTest!Database(source);    
+    */
 }
 
 void databaseCreation(Database) (string source) {
