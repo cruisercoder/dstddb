@@ -40,7 +40,7 @@ auto createDatabase(T)(string defaultURI="") {
  */
 
 
-void check(string msg, sword status) {
+void check()(string msg, sword status) {
     info(msg, ":", status);
     if (status == OCI_SUCCESS) return;
     throw new DatabaseException("OCI error: " ~ msg);
@@ -119,7 +119,8 @@ struct Connection(T) {
     // temporary
     auto statement (string sql) { return Statement!T(this, sql); }
     auto statement(X...) (string sql, X args) {return Statement!T(this, sql, args);}
-    void execute(string sql) {statement(sql);}
+    auto execute(string sql) {return statement(sql).execute();}
+    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
 
     package this(Database!T db, string source="") {
         data_ = Data(db,source);
@@ -179,7 +180,7 @@ struct Connection(T) {
 
 static const nameSize = 256;
 
-struct Describe {
+struct Describe(T) {
     //char[nameSize] name;
 
     OraText* ora_name;
@@ -195,7 +196,7 @@ struct Describe {
     OCIDefine *define;
 }
 
-struct Bind {
+struct Bind(T) {
     void* data;
     sb4 allocSize;
     ub2 type;
@@ -208,6 +209,7 @@ struct Bind {
 
 struct Statement(T) {
     alias Allocator = T.Allocator;
+    alias Bind = .Bind!T;
     //alias Connection = .Connection!T;
     //alias Result = .Result;
     //alias Range = Result.Range;
@@ -216,20 +218,20 @@ struct Statement(T) {
 
     // temporary
     auto result() {return Result!T(this);}
-    auto opSlice() {return Result!T(this).opSlice();} // no size error
+    auto opSlice() {return Result!T(this);} // no size error
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        if (!data_.binds) execute();
+        //if (!data_.binds) execute();
     }
 
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
         bindAll(args);
-        execute();
+        //execute();
     }
 
     string sql() {return data_.sql;}
@@ -365,7 +367,9 @@ struct Statement(T) {
         info("binds: ", data_.binds);
     }
 
-    void execute() {
+    public:
+
+    auto execute() {
         ub4 iters = data_.stmt_type == OCI_STMT_SELECT ? 0:1;
         info("iters: ", iters);
         info("execute sql: ", data_.sql);
@@ -379,15 +383,18 @@ struct Statement(T) {
                     null,
                     null,
                     OCI_COMMIT_ON_SUCCESS));
+        return result();
     }
 
-    void execute(X...) (X args) {
+    auto execute(X...) (X args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        execute();
+        return execute();
     }
+
+    private:
 
     void bindAll(T...) (T args) {
         int col;
@@ -403,6 +410,8 @@ struct Statement(T) {
 
 struct Result(T) {
     alias Allocator = T.Allocator;
+    alias Describe = .Describe!T;
+    alias Bind = .Bind!T;
     //alias Statement = .Statement!T;
     //alias ResultRange = .ResultRange!T;
     alias Range = ResultRange;
@@ -567,6 +576,7 @@ struct Result(T) {
 }
 
 struct Value(T) {
+    alias Bind = .Bind!T;
     package Bind* bind_;
 
     this(Bind* bind) {

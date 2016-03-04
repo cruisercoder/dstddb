@@ -71,7 +71,8 @@ struct Connection(T) {
     // temporary helper functions
     auto statement(string sql) {return Statement!T(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {auto stmt = Statement!T(this, sql);}
+    auto execute(string sql) {return statement(sql).execute();}
+    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
 
     private struct Payload {
         Database!T db;
@@ -178,20 +179,20 @@ struct Statement(T) {
 
     // temporary
     auto result() {return Result!T(this);}
-    auto opSlice() {return result().opSlice();}
+    auto opSlice() {return result();}
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        if (!data_.binds) execute();
+        //if (!data_.binds) execute();
     }
 
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
         bindAll(args);
-        execute();
+        //execute();
     }
 
     string sql() {return data_.sql;}
@@ -325,16 +326,21 @@ struct Statement(T) {
         data_.prepare();
     }
 
-    void execute() {
+    // clean up
+    public:
+
+
+    auto execute() {
         data_.execute();
+        return result();
     }
 
-    void execute(X...) (X args) {
+    auto execute(X...) (X args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        execute();
+        return execute();
     }
 
     void bindAll(T...) (T args) {
@@ -344,12 +350,18 @@ struct Statement(T) {
         }
     }
 
+    private:
+
     void reset() {
         //SQLCloseCursor
     }
 
-
     static void check(string msg, MYSQL_STMT* stmt, int ret) {
+        info(msg, ":", ret);
+        if (ret) error(msg,stmt,ret);
+    }
+
+    static void error(string msg, MYSQL_STMT* stmt, int ret) {
         info(msg, ":", ret);
         if (!ret) return;
         import core.stdc.string: strlen;
@@ -398,6 +410,7 @@ package:
             allocator = stmt.data_.allocator;
 
             result_metadata = mysql_stmt_result_metadata(stmt.data_.stmt);
+            if (!result_metadata) return;
             //columns = mysql_num_fields(result_metadata);
 
             build_describe();
@@ -465,7 +478,9 @@ package:
             } else if (status == MYSQL_DATA_TRUNCATED) {
                 throw new DatabaseException("fetch: database truncation");
             }
-            throw new DatabaseException("fetch error");
+
+            stmt.error("mysql_stmt_fetch",stmt.data_.stmt,status);
+            return false;
         }
 
         this(this) { assert(false); }

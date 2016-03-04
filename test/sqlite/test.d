@@ -15,11 +15,11 @@ unittest {
 
 unittest {
     auto db = createDatabase("path:///testdb");
-    auto con = db.connection();
-    //con.statement("select * from score").writeResult();
-    auto range = con.statement("select name,score from score")[];
-    foreach (r; range) {
+    //auto rowSet = db.connection().statement("select name,score from score").execute;
+    auto rowSet = db.connection().execute("select name,score from score");
+    foreach (r; rowSet) {
         writeln(r[0].as!string,",",r[1].as!int);
+        //writeln(r[0],", ",r[1]);
     }
 }
 

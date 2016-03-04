@@ -17,7 +17,7 @@ unittest {
     con.execute("drop table t");
 
     auto stmt = statement(con, "select * from t");
-    auto res = stmt.result();
+    auto res = stmt.execute();
 
     auto range = res[];
 

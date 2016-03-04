@@ -5,8 +5,8 @@ import std.traits;
 import std.string;
 
 void writeResult(T) (T t) {
-    static if (hasMember!(T, "range")) { // improve
-        writeResultRange(t.range());
+    static if (hasMember!(T, "opSlice")) { // improve
+        writeResultRange(t[]);
     } else {
         writeResultRange(t);
     }

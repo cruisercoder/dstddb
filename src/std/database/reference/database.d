@@ -19,12 +19,12 @@ struct DefaultPolicy {
 // this function is module specific because it allows 
 // a default template to be specified
 auto createDatabase()(string defaultUrl=null) {
-    return Database!DefaultPolicy.create(defaultUrl);  
+    return Database!DefaultPolicy(defaultUrl);  
 }
 
 //one for specfic type
 auto createDatabase(T)(string defaultUrl=null) {
-    return Database!T.create(defaultUrl);  
+    return Database!T(defaultUrl);  
 }
 
 // these functions can be moved into util once a solution to forward bug is found
@@ -48,10 +48,6 @@ auto result(T)(Statement!T stmt) {
 struct Database(T) {
     alias Allocator = T.Allocator;
 
-    static Database create(string defaultURI) {
-        //abc();
-        return Database!T(defaultURI);
-    }
 
     private struct Payload {
         string defaultURI;
@@ -84,9 +80,10 @@ struct Connection(T) {
     alias Database = .Database!T;
     //alias Statement = .Statement!T;
 
-    void execute(string sql) {
-
-    }
+    auto statement(string sql) {return Statement!T(this,sql);}
+    auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
+    auto execute(string sql) {return statement(sql).execute();}
+    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
 
     package this(Database db, string source) {
         data_ = Data(db,source);
@@ -121,6 +118,10 @@ struct Statement(T) {
 
     alias Result = .Result;
     //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
+
+    // temporary
+    auto result() {return Result!T(this);}
+    auto opSlice() {return result();}
 
     this(Connection con, string sql) {
         data_ = Data(con,sql);
@@ -165,9 +166,20 @@ struct Statement(T) {
     alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     Data data_;
 
+    public:
+
     void exec() {}
     void prepare() {}
-    void execute() {}
+
+    auto execute() {
+        return result();
+    }
+
+    auto execute(X...) (X args) {
+        return execute();
+    }
+
+    private:
 
     void bindAll(T...) (T args) {
         int col;

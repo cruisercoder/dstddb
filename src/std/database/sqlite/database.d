@@ -54,7 +54,7 @@ struct Database(T) {
     //auto connection(string uri) {return pool_.get(uri);}
     auto connection(string url="") {return Connection!T(this, url);}
     //auto connection() {return pool_.get();}
-    auto execute(string sql) {this.connection().execute(sql);}
+    auto execute(string sql) {return this.connection().execute(sql);}
 
 
     bool bindable() {return true;}
@@ -88,8 +88,9 @@ struct Connection(T) {
 
     // temporary helper functions
     auto statement(string sql) {return Statement!T(this,sql);}
-    auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {auto stmt = Statement!T(this, sql);}
+    //auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
+    auto execute(string sql) {return statement(sql).execute();}
+    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
 
     void error(string msg, int ret) {throw_error(data_.sq, msg, ret);}
 
@@ -142,8 +143,13 @@ struct Statement(T) {
     //alias Result = .Result!T;
     //alias Range = .ResultRange!T;
 
+    enum State {
+        Init,
+        Execute,
+    }
+
     // temporary
-    auto result() {return Result!T(this);}
+    auto result() {return Result!T(this);} // private?
     auto opSlice() {return result().opSlice();}
 
     void error(string msg, int ret) {data_.con.error(msg, ret);}
@@ -152,14 +158,16 @@ struct Statement(T) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        if (!data_.binds) execute();
+        //if (!data_.binds) execute();
     }
 
+    /*
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
         execute(args);
     }
+    */
 
     string sql() {return data_.sql;}
 
@@ -194,7 +202,10 @@ struct Statement(T) {
 
     int binds() {return sqlite3_bind_parameter_count(data_.st);}
 
-    void execute() {
+    auto execute() {
+        //if (data_.state == State.Execute) throw new DatabaseException("already executed"); // restore
+        if (data_.state == State.Execute) return result();
+        data_.state = State.Execute;
         int status = sqlite3_step(data_.st);
         info("sqlite3_step: status: ", status);
         if (status == SQLITE_ROW) {
@@ -202,14 +213,15 @@ struct Statement(T) {
         } else if (status == SQLITE_DONE) {
             reset();
         } else throw new DatabaseException("step error");
+        return result();
     }
 
-    void execute(T...) (T args) {
+    auto execute(T...) (T args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        execute();
+        return execute();
     }
 
     bool hasRows() {
@@ -221,6 +233,7 @@ struct Statement(T) {
     struct Payload {
         Connection!T con;
         string sql;
+        State state;
         sqlite3* sq;
         sqlite3_stmt *st;
         bool hasRows;
@@ -229,6 +242,7 @@ struct Statement(T) {
         this(Connection!T con_, string sql_) {
             con = con_;
             sql = sql_;
+            state = State.Init;
             sq = con.data_.sq;
         }
 
@@ -344,7 +358,6 @@ struct Value(T) {
 
     auto chars() {
         import core.stdc.string: strlen;
-        //auto data = cast(char*) bind_.data;
         auto data = sqlite3_column_text(result_.data_.st_, cast(int) idx_);
         return data ? data[0 .. strlen(data)] : data[0..0];
     }

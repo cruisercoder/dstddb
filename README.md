@@ -29,17 +29,16 @@ auto db = createDatabase("mysql://database");
 db.execute("insert into table('name',123)");
 ```
 
-#### classic style select
+#### expanded classic style select
 ```D
 import std.database.mysql;
 auto db = createDatabase("mysql://127.0.0.1/test");
 auto con = db.connection();
 auto stmt = con.statement("select * from table");
+auto rowSet = stmt.execute();
 auto range = stmt[];
 foreach (row; range) {
-    for(size_t col = 0; col != row.columns; ++col) {
-        write(rowr[col]), " ");
-    }
+    for(size_t col = 0; col != row.columns; ++col) write(rowr[col]), " ");
     writeln();
 }
 
@@ -48,17 +47,18 @@ foreach (row; range) {
 ```D
 import std.database.sqlite;
 createDatabase("file:///demo.sqlite")
-.connection()
-    .statement("select * from t1")[]
+    .connection()
+    .execute("select * from t1")
     .writeResult();
     ```
 
 #### field access
     ```D
 import std.database.sqlite;
-createDatabase("file:///demo.sqlite").connection().statement("select name,age from t1")[]
-foreach (row; range) {
-    writeln(row[0].as!string, ", ", row[1].as!int);
+auto db = createDatabase("file:///testdb");
+auto rowSet = db.connection().execute("select name,score from score");
+foreach (r; rowSet) {
+    writeln(r[0].as!string,",",r[1].as!int);
 }
 
 ```
@@ -68,8 +68,8 @@ foreach (row; range) {
 import std.database.sqlite;
 int minScore = 50;
 createDatabase("file:///demo.sqlite")
-.connection()
-    .statement("select * from t1 where score >= ?", minScore)
+    .connection()
+    .execute("select * from t1 where score >= ?", minScore)
     .writeResult();
     ```
 

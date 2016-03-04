@@ -11,7 +11,7 @@ unittest {
     //testAll!DB("odbc");
 
     auto db = createDatabase("odbc");
-    db.showDrivers(); // odbc
+    //db.showDrivers(); // odbc
 
     auto con = db.connection();
 

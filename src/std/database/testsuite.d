@@ -14,6 +14,7 @@ void testAll(Database) (string source) {
 
     fieldAccess(db);
 
+    bindTest0(db);
     bindTest1(db);
     bindTest2(db);
 
@@ -33,7 +34,10 @@ void simpleInsertSelect(D) (D db) {
     info("simpleInsertSelect");
     create_score_table(db, "score");
     db.execute("insert into score values('Person',123)");
-    writeResult(db.connection().statement("select * from score"));
+
+    //writeResult(db.connection().statement("select * from score")); // maybe should work too?
+    writeResult(db.connection().statement("select * from score").execute());
+
 }
 
 void classicSelect(Database) (Database db) {
@@ -41,9 +45,8 @@ void classicSelect(Database) (Database db) {
     string table = "t1";
     create_score_table(db, table);
     auto con = db.connection();
-    auto stmt = con.statement("select * from " ~ table);
-    auto range = stmt[];
-    foreach (r; range) {
+    auto result = con.execute("select * from " ~ table);
+    foreach (r; result[]) {
         for(size_t c = 0; c != r.columns; ++c) {
             if (c) write(",");
             write("", r[c].chars()); // why fail when not .chars()?
@@ -53,11 +56,24 @@ void classicSelect(Database) (Database db) {
 }
 
 void fieldAccess(Database)(Database db) {
-    auto range = db.connection().statement("select name,score from score")[];
-    foreach (r; range) {
+    auto rowSet = db.connection().execute("select name,score from score");
+    foreach (r; rowSet) {
         writeln(r[0].as!string,",",r[1].as!int);
     }
 }
+
+void bindTest0(Database) (Database db) {
+    if (!db.bindable()) {
+        writeln("skip bindTest");
+        return;
+    }
+
+    create_score_table(db, "t1");
+    auto res = db.connection().execute("select name,score from t1 where score >= ?",50);
+    assert(res.columns() == 2);
+    writeResult(res[]);
+}
+
 
 void bindTest1(Database) (Database db) {
     if (!db.bindable()) {
@@ -66,9 +82,9 @@ void bindTest1(Database) (Database db) {
     }
 
     create_score_table(db, "t1");
-    auto stmt = db.connection().statement("select name,score from t1 where score >= ?", 50);
+    auto stmt = db.connection().statement("select name,score from t1 where score >= ?");
     assert(stmt.binds() == 1);
-    auto res = stmt.result();
+    auto res = stmt.execute(50);
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -80,12 +96,13 @@ void bindTest2(Database) (Database db) {
     }
 
     create_score_table(db, "t1");
-    auto stmt = db.connection().statement(
-            "select name,score from t1 where score >= ? and score < ?",
-            50,
-            80);
+
+    // clean up / clarify
+
+    auto stmt = db.connection()
+        .statement("select name,score from t1 where score >= ? and score < ?");
     assert(stmt.binds() == 2);
-    auto res = stmt.result();
+    auto res = stmt.execute(50, 80);
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -103,7 +120,7 @@ void bindInsertTest(Database) (Database db) {
     stmt.execute("a",1);
     stmt.execute("b",2);
     stmt.execute("c",3);
-    con.statement("select * from score").writeResult();
+    con.execute("select * from score").writeResult();
 }
 
 void cascadeTest(Database) (Database db) {
@@ -111,7 +128,7 @@ void cascadeTest(Database) (Database db) {
     writeln("cascade write_result test");
     db
         .connection()
-        .statement("select * from t1")
+        .execute("select * from t1")
         .writeResult();
     writeln();
 } 

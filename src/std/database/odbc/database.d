@@ -130,7 +130,8 @@ struct Connection(T) {
     // temporary helper functions
     auto statement(string sql) {return Statement!T(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {Statement!T(this, sql);}
+    auto execute(string sql) {return statement(sql).execute();}
+    auto execute(string sql, T...) (T args) {return statement(sql).execute(args);}
 
     package this(Database!T db, string source="") {
         data_ = Data(db,source);
@@ -189,25 +190,25 @@ struct Connection(T) {
 
 struct Statement(T) {
     alias Allocator = T.Allocator;
+    alias Bind = .Bind!T;
     //alias Result = .Result;
     //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
 
     // temporary
     auto result() {return Result!T(this);}
-    auto opSlice() {return result().opSlice();} // no size error
+    auto opSlice() {return result();} // no size error
 
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        if (!data_.binds) execute();
+        //if (!data_.binds) execute();
     }
 
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
         bindAll(args);
-        execute();
     }
 
     string sql() {return data_.sql;}
@@ -311,6 +312,8 @@ struct Statement(T) {
         info("binds: ", data_.binds);
     }
 
+    public:
+
     void execute() {
         if (!data_.binds) {
             info("sql execute direct: ", data_.sql);
@@ -333,6 +336,8 @@ struct Statement(T) {
         execute();
     }
 
+    private:
+
     void bindAll(T...) (T args) {
         int col;
         foreach (arg; args) {
@@ -346,9 +351,9 @@ struct Statement(T) {
 
 }
 
-static const nameSize = 256;
 
-struct Describe {
+struct Describe(T) {
+    static const nameSize = 256;
     char[nameSize] name;
     SQLSMALLINT nameLen;
     SQLSMALLINT type;
@@ -360,7 +365,7 @@ struct Describe {
     SQLLEN datLen;
 }
 
-struct Bind {
+struct Bind(T) {
     SQLSMALLINT type;
     SQLSMALLINT dbtype;
     //SQLCHAR* data[maxData];
@@ -378,6 +383,8 @@ struct Bind {
 
 struct Result(T) {
     alias Allocator = T.Allocator;
+    alias Describe = .Describe!T;
+    alias Bind = .Bind!T;
     alias Range = .ResultRange!T;
     alias Row = .Row!T;
 
@@ -435,7 +442,7 @@ struct Result(T) {
                             stmt.data_.stmt,
                             cast(SQLUSMALLINT) (i+1),
                             cast(SQLCHAR *) d.name,
-                            cast(SQLSMALLINT) nameSize,
+                            cast(SQLSMALLINT) Describe.nameSize,
                             &d.nameLen,
                             &d.type,
                             &d.size,
@@ -513,6 +520,7 @@ struct Result(T) {
 }
 
 struct Value(T) {
+    alias Bind = .Bind!T;
     package Bind* bind_;
 
     this(Bind* bind) {
@@ -526,18 +534,16 @@ struct Value(T) {
     }
 
     auto as(T:string)() {
-        import core.stdc.string: strlen;
         check(bind_.type, SQL_C_CHAR);
         auto ptr = cast(immutable char*) bind_.data;
-        return cast(string) ptr[0..strlen(ptr)]; // fix with length
+        return cast(string) ptr[0..bind_.len];
     }
 
     //inout(char)[]
     auto chars() {
         check(bind_.type, SQL_C_CHAR);
-        import core.stdc.string: strlen;
         auto data = cast(char*) bind_.data;
-        return data ? data[0 .. strlen(data)] : data[0..0];
+        return data ? data[0..bind_.len] : data[0..0];
     }
 
     private:
