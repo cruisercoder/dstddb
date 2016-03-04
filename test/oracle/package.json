@@ -6,6 +6,7 @@
     "authors": [
         "Erik Smith"
     ],
+    "versions": ["StdLoggerDisableInfo"],
     "sourcePaths": [".", "../../src"],
     "libs" : ["occi","clntsh"],
     "dependencies": {

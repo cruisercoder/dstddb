@@ -30,7 +30,7 @@ void databaseCreation(Database) (string source) {
 }
 
 void simpleInsertSelect(D) (D db) {
-    log("simpleInsertSelect");
+    info("simpleInsertSelect");
     create_score_table(db, "score");
     db.execute("insert into score values('Person',123)");
     writeResult(db.connection().statement("select * from score"));
@@ -134,10 +134,10 @@ void polyTest(DB) (string source) {
 void drop_table(D) (D db, string table) {
     //db.execute("drop table if exists " ~ table ~ ";");
     try {
-        log("drop table:  ", table);
+        info("drop table:  ", table);
         db.execute("drop table " ~ table);
     } catch (Exception e) {
-        log("drop table error (ignored): ", e.msg);
+        info("drop table error (ignored): ", e.msg);
     }
 }
 

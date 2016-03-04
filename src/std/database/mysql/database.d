@@ -91,7 +91,7 @@ struct Connection(T) {
         }
 
         ~this() {
-            writeln("mysql closing ", uri);
+            info("mysql closing ", uri);
             if (mysql) {
                 mysql_close(mysql);
                 mysql = null;
@@ -160,7 +160,7 @@ void binder(T)(ref T allocator, int n, Bind *b, MYSQL_BIND *mb) {
     mb.error = &b.error;
 
     /*
-       log(
+       info(
        "bind: index: ", n,
        ", type: ", mb.buffer_type,
        ", allocSize: ", b.allocSize);
@@ -198,7 +198,7 @@ struct Statement(T) {
     int binds() {return data_.binds;}
 
     void bind(int n, int value) {
-        log("input bind: n: ", n, ", value: ", value);
+        info("input bind: n: ", n, ", value: ", value);
         if (n==0) throw new DatabaseException("zero index");
 
         {
@@ -220,7 +220,7 @@ struct Statement(T) {
 
     void bind(int n, const char[] value){
         import core.stdc.string: strncpy;
-        log("input bind: n: ", n, ", value: ", value);
+        info("input bind: n: ", n, ", value: ", value);
         // need default allocSize, bounds checking
 
         {
@@ -240,7 +240,7 @@ struct Statement(T) {
             strncpy(p, value.ptr, value.length);
             p[value.length] = 0;
             b.length = value.length;
-            //writeln("BOUND VALUE: -", p[0..b.length], "-",
+            //info("BOUND VALUE: -", p[0..b.length], "-",
             //", length: ", b.length,
             //", is_null: ", cast(bool) b.is_null);
         }
@@ -351,11 +351,11 @@ struct Statement(T) {
 
 
     static void check(string msg, MYSQL_STMT* stmt, int ret) {
-        log(msg, ":", ret);
+        info(msg, ":", ret);
         if (!ret) return;
         import core.stdc.string: strlen;
         const(char*) err = mysql_stmt_error(stmt);
-        writeln("error: ", err[0..strlen(err)]);
+        info("error: ", err[0..strlen(err)]); //fix
         throw new DatabaseException("mysql error: " ~ msg);
     }
 
@@ -434,7 +434,7 @@ package:
 
                 //d.type = info[di.field.type].type;
 
-                log("describe: name: ", d.name, ", mysql type: ", d.field.type);
+                info("describe: name: ", d.name, ", mysql type: ", d.field.type);
             }
         }
 
@@ -517,7 +517,7 @@ struct Value(T) {
     private:
 
     void check(int a, int b) {
-        log(a, ":", b);
+        info(a, ":", b);
         if (a != b) throw new DatabaseException("type mismatch");
     }
 

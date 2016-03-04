@@ -3,6 +3,7 @@ module std.database.poly.database;
 import std.string;
 import core.stdc.stdlib;
 import std.conv;
+import std.experimental.logger;
 
 public import std.database.exception;
 
@@ -20,7 +21,7 @@ struct Database {
 
     static void register(Database) (string name = "") {
         name = "name"; // synth name
-        writeln(
+        info(
                 "poly register: ",
                 "name: ", name, ", "
                 "type: ", typeid(Database),

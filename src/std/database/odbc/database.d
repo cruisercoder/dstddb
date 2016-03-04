@@ -70,7 +70,7 @@ struct Database(T) {
         SQLRETURN ret;
 
         direction = SQL_FETCH_FIRST;
-        log("DRIVERS:");
+        info("DRIVERS:");
         while(SQL_SUCCEEDED(ret = SQLDrivers(
                         data_.env, 
                         direction,
@@ -81,7 +81,7 @@ struct Database(T) {
                         attr.sizeof, 
                         &attr_ret))) {
             direction = SQL_FETCH_NEXT;
-            log(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
+            info(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
             //if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
         }
     }
@@ -108,7 +108,7 @@ struct Database(T) {
         }
 
         ~this() {
-            log("odbc: closing database");
+            info("odbc: closing database");
             if (!env) return;
             check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
             env = null;
@@ -148,7 +148,7 @@ struct Connection(T) {
             db = db_;
             source = source_.length == 0 ? db.data_.defaultURI : source_;
 
-            log("ODBC opening connection: ", source);
+            info("ODBC opening connection: ", source);
 
             char[1024] outstr;
             SQLSMALLINT outstrlen;
@@ -173,7 +173,7 @@ struct Connection(T) {
         }
 
         ~this() {
-            log("ODBC closing connection: ", source);
+            info("ODBC closing connection: ", source);
             if (connected) check("SQLDisconnect", SQLDisconnect(con));
             check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_DBC, con));
         }
@@ -214,7 +214,7 @@ struct Statement(T) {
     int binds() {return data_.binds;}
 
     void bind(int n, int value) {
-        log("input bind: n: ", n, ", value: ", value);
+        info("input bind: n: ", n, ", value: ", value);
 
         Bind b;
         b.type = SQL_C_LONG;
@@ -229,7 +229,7 @@ struct Statement(T) {
 
     void bind(int n, const char[] value){
         import core.stdc.string: strncpy;
-        log("input bind: n: ", n, ", value: ", value);
+        info("input bind: n: ", n, ", value: ", value);
         // no null termination needed
 
         Bind b;
@@ -308,18 +308,18 @@ struct Statement(T) {
         check("SQLNumParams", SQLNumParams(data_.stmt, &v));
         data_.binds = v;
         check("SQLNumResultCols", SQLNumResultCols (data_.stmt, &v));
-        log("binds: ", data_.binds);
+        info("binds: ", data_.binds);
     }
 
     void execute() {
         if (!data_.binds) {
-            log("sql execute direct: ", data_.sql);
+            info("sql execute direct: ", data_.sql);
             check("SQLExecDirect", SQLExecDirect(
                         data_.stmt,
                         cast(SQLCHAR*) toStringz(data_.sql),
                         SQL_NTS));
         } else {
-            log("sql execute prepared: ", data_.sql);
+            info("sql execute prepared: ", data_.sql);
             SQLRETURN ret = SQLExecute(data_.stmt);
             check("SQLExecute()", SQL_HANDLE_STMT, data_.stmt, ret);
         }
@@ -423,7 +423,7 @@ struct Result(T) {
             SQLSMALLINT v;
             check("SQLNumResultCols", SQLNumResultCols (stmt.data_.stmt, &v));
             columns = v;
-            log("columns: ", columns);
+            info("columns: ", columns);
 
             describe.reserve(columns);
 
@@ -442,7 +442,7 @@ struct Result(T) {
                             &d.digits,
                             &d.nullable));
 
-                //log("NAME: ", d.name, ", type: ", d.type);
+                //info("NAME: ", d.name, ", type: ", d.type);
             }
         }
 
@@ -482,7 +482,7 @@ struct Result(T) {
                             b.size,
                             &b.len));
 
-                log(
+                info(
                         "output bind: index: ", i,
                         ", type: ", b.type,
                         ", size: ", b.size,
@@ -491,7 +491,7 @@ struct Result(T) {
         }
 
         bool next() {
-            //log("SQLFetch");
+            //info("SQLFetch");
             status = SQLFetch(stmt.data_.stmt);
             if (status == SQL_SUCCESS) {
                 return true; 
@@ -592,13 +592,13 @@ struct ResultRange(T) {
 }
 
 void check()(string msg, SQLRETURN ret) {
-    log(msg, ":", ret);
+    info(msg, ":", ret);
     if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) return;
     throw new DatabaseException("odbc error: " ~ msg);
 }
 
 void check()(string msg, SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN ret) {
-    log(msg, ":", ret);
+    info(msg, ":", ret);
     if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) return;
     throw_detail(handle, handle_type, msg);
 }
@@ -628,7 +628,7 @@ void throw_detail()(SQLHANDLE handle, SQLSMALLINT type, string msg) {
 
         if (SQL_SUCCEEDED(ret)) {
             auto s = text[0..len];
-            log("error: ", s);
+            info("error: ", s);
             //error =~ s;
             //writefln("%s:%ld:%ld:%s\n", state, i, native, text);
         }

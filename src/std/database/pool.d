@@ -21,10 +21,10 @@ struct Pool(D,R) {
 
     auto get(string source = "") {
         if (!pool.empty()) {
-            log("pool: return back");
+            info("pool: return back");
             return pool.back();
         }
-        log("pool: create");
+        info("pool: create");
         Resource r = db.connection(source);
         data ~= Elem(r);
         return r;

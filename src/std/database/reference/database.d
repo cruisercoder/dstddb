@@ -58,13 +58,13 @@ struct Database(T) {
         Allocator allocator;
 
         this(string defaultURI_) {
-            writeln("opening database resource");
+            info("opening database resource");
             defaultURI = defaultURI_;
             allocator = Allocator();
         }
 
         ~this() {
-            writeln("closing database resource");
+            info("closing database resource");
         }
 
         this(this) { assert(false); }

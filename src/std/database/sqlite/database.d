@@ -47,7 +47,7 @@ struct Database(T) {
     this(string defaultSource) {
         data_ = Data(defaultSource);
         //pool_ = PoolType(this);
-        //log("Database: defaultSource: ", data_.defaultSource);
+        //info("Database: defaultSource: ", data_.defaultSource);
     }
 
     // temporary helper functions
@@ -196,7 +196,7 @@ struct Statement(T) {
 
     void execute() {
         int status = sqlite3_step(data_.st);
-        log("sqlite3_step: status: ", status);
+        info("sqlite3_step: status: ", status);
         if (status == SQLITE_ROW) {
             data_.hasRows = true;
         } else if (status == SQLITE_DONE) {
@@ -403,7 +403,7 @@ struct ResultRange(T) {
 void throw_error()(sqlite3 *sq, string msg, int ret) {
     import core.stdc.string: strlen;
     const(char*) err = sqlite3_errmsg(sq);
-    log(msg, ":", err[0..strlen(err)]);
+    info(msg, ":", err[0..strlen(err)]);
     throw new DatabaseException("sqlite error: " ~ msg ~ ": "); // need to send err
 }
 

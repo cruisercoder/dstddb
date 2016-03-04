@@ -41,7 +41,7 @@ auto createDatabase(T)(string defaultURI="") {
 
 
 void check(string msg, sword status) {
-    log(msg, ":", status);
+    info(msg, ":", status);
     if (status == OCI_SUCCESS) return;
     throw new DatabaseException("OCI error: " ~ msg);
 }
@@ -78,7 +78,7 @@ struct Database(T=DefaultPolicy) {
         this(string defaultURI_) {
             allocator = Allocator();
             defaultURI = defaultURI_;
-            writeln("oracle: opening database");
+            info("oracle: opening database");
             ub4 mode = OCI_THREADED | OCI_OBJECT;
 
             check("OCIEnvCreate", OCIEnvCreate(
@@ -100,7 +100,7 @@ struct Database(T=DefaultPolicy) {
         }
 
         ~this() {
-            writeln("oracle: closing database");
+            info("oracle: closing database");
             if (env) {
                 sword status = OCIHandleFree(env, OCI_HTYPE_ENV);
                 env = null;
@@ -241,7 +241,7 @@ struct Statement(T) {
 
     void bind(int n, int value) {
         /*
-           log("input bind: n: ", n, ", value: ", value);
+           info("input bind: n: ", n, ", value: ", value);
 
            Bind b;
            b.type = SQL_C_LONG;
@@ -258,7 +258,7 @@ struct Statement(T) {
     void bind(int n, const char[] value){
         /*
            import core.stdc.string: strncpy;
-           log("input bind: n: ", n, ", value: ", value);
+           info("input bind: n: ", n, ", value: ", value);
         // no null termination needed
 
         Bind b;
@@ -366,13 +366,13 @@ struct Statement(T) {
                     OCI_ATTR_BIND_COUNT,
                     data_.error));
 
-        log("binds: ", data_.binds);
+        info("binds: ", data_.binds);
     }
 
     void execute() {
         ub4 iters = data_.stmt_type == OCI_STMT_SELECT ? 0:1;
-        log("iters: ", iters);
-        log("execute sql: ", data_.sql);
+        info("iters: ", iters);
+        info("execute sql: ", data_.sql);
 
         check("OCIStmtExecute", OCIStmtExecute(
                     data_.con.data_.svc_ctx,
@@ -462,7 +462,7 @@ struct Result(T) {
                         OCI_ATTR_PARAM_COUNT,
                         error));
             columns = numcols;
-            log("columns: ", columns);
+            info("columns: ", columns);
 
             describe.reserve(columns);
             for(int i = 0; i < columns; ++i) {
@@ -502,7 +502,7 @@ struct Result(T) {
                             error));
 
                 d.name = to!string(cast(char*)(d.ora_name)[0..d.name_len]);
-                log("describe: name: ", d.name, ", type: ", d.type, ", size: ", d.size);
+                info("describe: name: ", d.name, ", type: ", d.type, ", size: ", d.size);
             }
 
         }
@@ -541,7 +541,7 @@ struct Result(T) {
 
         bool next() {
 
-            //log("OCIStmtFetch2");
+            //info("OCIStmtFetch2");
             status = OCIStmtFetch2(
                     stmt.data_.stmt,
                     error,
