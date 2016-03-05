@@ -232,11 +232,26 @@ struct BasicValue(T,Impl) {
     //inout(char)[]
     char[] chars() {
         Impl.checkType!string(bind_);
-        //return Impl.get!(char[])(bind_); // not working
-        auto d = cast(char*) bind_.data.ptr;
-        return d? d[0..bind_.length] : d[0..0];
+        return Impl.get!(char[])(bind_); 
     }
 }
+
+class A(T) {
+    static T get(T:char[])() {return [];}
+    static T get(T:string)() {return "";}
+}
+
+void foo(T)() {
+    char[] a = A!int.get!(char[])();
+}
+
+void foo2() {
+    foo!int();
+}
+
+
+
+
 
 
 // -----------------------------------------------
@@ -465,7 +480,6 @@ struct StatementImpl(T) {
     }
 }
 
-
 struct ResultImpl(T) {
     this(this) { assert(false); }
     void opAssign(ResultImpl rhs) { assert(false); }
@@ -565,7 +579,7 @@ struct ResultImpl(T) {
     // value getters (experimental design)
 
     static auto get(X:char[])(Bind *b) {
-        auto ptr = cast(immutable char*) b.data.ptr;
+        auto ptr = cast(char*) b.data.ptr;
         return ptr[0..b.length];
     }
 
@@ -591,5 +605,4 @@ struct ResultImpl(T) {
     struct TypeInfo(T:string) {static int type() {return MYSQL_TYPE_STRING;}}
 
 }
-
 
