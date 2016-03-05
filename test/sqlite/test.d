@@ -1,4 +1,4 @@
-module std.database.mysql.test;
+module std.database.sqlite.test;
 import std.database.sqlite;
 import std.database.util;
 import std.stdio;
