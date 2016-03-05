@@ -191,6 +191,53 @@ struct Row(T) {
     private Result* result_;
 }
 
+// WIP
+struct BasicValue(T,Impl) {
+    alias Bind = .Bind!T;
+    private Bind* bind_;
+
+    this(Bind* bind) {
+        bind_ = bind;
+    }
+
+    struct generate(X,Y) {
+        static void assign(void *x_, void *y_) {
+            Bind *x = cast(Bind*) x_;
+            *cast(Y*) y_ = to!Y(Impl.get!X(x));
+        }
+    }
+
+    auto convert(X,Y)(Bind *b) {
+        Y y;
+        generate!(X,Y).assign(b,&y);
+        return y;
+    }
+
+    struct Elem {
+        int type;
+        void function() assign(void*,void*);
+    }
+
+    auto as(T:int)() {
+        if (bind_.mysql_type == MYSQL_TYPE_STRING) return convert!(string,T)(bind_);
+        Impl.checkType!T(bind_);
+        return Impl.get!T(bind_);
+    }
+
+    auto as(T:string)() {
+        Impl.checkType!T(bind_);
+        return Impl.get!T(bind_);
+    }
+
+    //inout(char)[]
+    char[] chars() {
+        Impl.checkType!string(bind_);
+        //return Impl.get!(char[])(bind_); // not working
+        auto d = cast(char*) bind_.data.ptr;
+        return d? d[0..bind_.length] : d[0..0];
+    }
+}
+
 
 // -----------------------------------------------
 // target database specfic code
@@ -200,6 +247,7 @@ alias Database(T) = BasicDatabase!(T,DatabaseImpl!T);
 alias Connection(T) = BasicConnection!(T,ConnectionImpl!T);
 alias Statement(T) = BasicStatement!(T,StatementImpl!T);
 alias Result(T) = BasicResult!(T,ResultImpl!T);
+alias Value(T) = BasicValue!(T,ResultImpl!T);
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -419,6 +467,9 @@ struct StatementImpl(T) {
 
 
 struct ResultImpl(T) {
+    this(this) { assert(false); }
+    void opAssign(ResultImpl rhs) { assert(false); }
+
     alias Allocator = T.Allocator;
     alias Describe = .Describe!T;
     alias Bind = .Bind!T;
@@ -511,46 +562,34 @@ struct ResultImpl(T) {
         return false;
     }
 
-    this(this) { assert(false); }
-    void opAssign(ResultImpl rhs) { assert(false); }
+    // value getters (experimental design)
+
+    static auto get(X:char[])(Bind *b) {
+        auto ptr = cast(immutable char*) b.data.ptr;
+        return ptr[0..b.length];
+    }
+
+    static auto get(X:string)(Bind *b) {
+        return cast(string) get!(char[])(b);
+    }
+
+    static auto get(X:int)(Bind *b) {
+        return *cast(int*) b.data.ptr;
+    }
+
+    // improve design
+    static void checkType(T)(Bind *b) {
+        int x = TypeInfo!T.type();
+        int y = b.mysql_type;
+        if (x == y) return;
+        info("type pair mismatch: ",x, ":", y);
+        throw new DatabaseException("type mismatch");
+    }
+
+    // clarify as a better 1-n bind mapping
+    struct TypeInfo(T:int) {static int type() {return MYSQL_TYPE_LONG;}}
+    struct TypeInfo(T:string) {static int type() {return MYSQL_TYPE_STRING;}}
+
 }
 
-
-struct Value(T) {
-    alias Bind = .Bind!T;
-    package Bind* bind_;
-
-    this(Bind* bind) {
-        bind_ = bind;
-    }
-
-    auto as(X:int)() {
-        if (bind_.mysql_type == MYSQL_TYPE_STRING) return to!int(as!string()); // tmp hack
-        check(bind_.mysql_type, MYSQL_TYPE_LONG);
-        return *cast(int*) bind_.data.ptr;
-    }
-
-    auto as(X:string)() {
-        check(bind_.mysql_type, MYSQL_TYPE_STRING);
-        auto ptr = cast(immutable char*) bind_.data.ptr;
-        return cast(string) ptr[0..bind_.length];
-    }
-
-    //inout(char)[]
-    auto chars() {
-        check(bind_.mysql_type, MYSQL_TYPE_STRING);
-        auto d = cast(char*) bind_.data.ptr;
-        return d? d[0..bind_.length] : d[0..0];
-    }
-
-    private:
-
-    void check(int a, int b) {
-        if (a != b) {
-            info("mismatch: ",a, ":", b); // fix
-            throw new DatabaseException("type mismatch");
-        }
-    }
-
-}
 
