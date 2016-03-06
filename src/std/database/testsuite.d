@@ -2,6 +2,7 @@ module std.database.testsuite;
 import std.database.util;
 import std.stdio;
 import std.experimental.logger;
+import std.datetime;
 
 void testAll(Database) (string source) {
 

@@ -2,6 +2,7 @@ module std.database.mysql.database;
 import std.conv;
 import core.stdc.config;
 import std.experimental.allocator.mallocator;
+import std.datetime;
 
 version(Windows) {
     pragma(lib, "libmysql");
@@ -14,6 +15,7 @@ import std.database.mysql.bindings;
 import std.database.exception;
 import std.database.resolver;
 import std.database.allocator;
+import std.database.impl;
 import std.container.array;
 import std.experimental.logger;
 import std.string;
@@ -21,7 +23,7 @@ import std.typecons;
 
 // -----------------------------------------------
 // template section for front end
-// can't move into common file until forward bug is fixed
+// can't move into common file (impl.d) until forward bug is fixed
 
 struct BasicDatabase(T,Impl) {
     alias Allocator = T.Allocator;
@@ -53,6 +55,7 @@ struct BasicDatabase(T,Impl) {
 
 
 struct BasicConnection(T,Impl) {
+    alias Allocator = T.Allocator;
     //alias Database = .Database;
     //alias Statement = .Statement;
 
@@ -67,6 +70,11 @@ struct BasicConnection(T,Impl) {
     package this(Database!T db, string uri="") {
         data_ = Data(db,uri);
     }
+
+    package this(Database!T db, ref Allocator allocator, string uri="") {
+        data_ = Data(db,uri);
+    }
+
 
 }
 
@@ -136,8 +144,6 @@ struct BasicResult(T,Impl) {
     auto opSlice() {return ResultRange!T(this);}
 
 package:
-    // can this be package?
-
     bool start() {return data_.status == 0;}
     bool next() {return data_.next();}
 
@@ -148,8 +154,7 @@ package:
 
 }
 
-struct ResultRange(T) {
-    // implements a One Pass Range
+struct BasicResultRange(T) {
     alias Result = .Result!T;
     alias Row = .Row!T;
 
@@ -161,20 +166,12 @@ struct ResultRange(T) {
         ok_ = result_.start();
     }
 
-    bool empty() {
-        return !ok_;
-    }
-
-    Row front() {
-        return Row(&result_);
-    }
-
-    void popFront() {
-        ok_ = result_.next();
-    }
+    bool empty() {return !ok_;}
+    Row front() {return Row(&result_);}
+    void popFront() {ok_ = result_.next();}
 }
 
-struct Row(T) {
+struct BasicRow(T) {
     alias Result = .Result!T;
     alias Value = .Value!T;
 
@@ -183,51 +180,23 @@ struct Row(T) {
     }
 
     int columns() {return result_.columns();}
-
-    Value opIndex(size_t idx) {
-        return Value(&result_.data_.bind[idx]);
-    }
+    Value opIndex(size_t idx) {return Value(&result_.data_.bind[idx]);}
 
     private Result* result_;
 }
 
-// WIP
 struct BasicValue(T,Impl) {
     alias Bind = .Bind!T;
     private Bind* bind_;
+    alias Converter = .Converter!Impl;
 
     this(Bind* bind) {
         bind_ = bind;
     }
 
-    struct generate(X,Y) {
-        static void assign(void *x_, void *y_) {
-            Bind *x = cast(Bind*) x_;
-            *cast(Y*) y_ = to!Y(Impl.get!X(x));
-        }
-    }
-
-    auto convert(X,Y)(Bind *b) {
-        Y y;
-        generate!(X,Y).assign(b,&y);
-        return y;
-    }
-
-    struct Elem {
-        int type;
-        void function() assign(void*,void*);
-    }
-
-    auto as(T:int)() {
-        if (bind_.mysql_type == MYSQL_TYPE_STRING) return convert!(string,T)(bind_);
-        Impl.checkType!T(bind_);
-        return Impl.get!T(bind_);
-    }
-
-    auto as(T:string)() {
-        Impl.checkType!T(bind_);
-        return Impl.get!T(bind_);
-    }
+    auto as(T:int)() {return Converter.convert!T(bind_);}
+    auto as(T:string)() {return Converter.convert!T(bind_);}
+    auto as(T:Date)() {return Converter.convert!T(bind_);}
 
     //inout(char)[]
     char[] chars() {
@@ -236,32 +205,17 @@ struct BasicValue(T,Impl) {
     }
 }
 
-class A(T) {
-    static T get(T:char[])() {return [];}
-    static T get(T:string)() {return "";}
-}
-
-void foo(T)() {
-    char[] a = A!int.get!(char[])();
-}
-
-void foo2() {
-    foo!int();
-}
-
-
-
-
-
-
 // -----------------------------------------------
 // target database specfic code
 
-//alias Database(T) = std.database.impl.Database!(T,DatabaseImpl!T);
+// alias Database(T) = std.database.impl.Database!(T,DatabaseImpl!T); // blocked by DMD bug
+
 alias Database(T) = BasicDatabase!(T,DatabaseImpl!T);
 alias Connection(T) = BasicConnection!(T,ConnectionImpl!T);
 alias Statement(T) = BasicStatement!(T,StatementImpl!T);
 alias Result(T) = BasicResult!(T,ResultImpl!T);
+alias ResultRange(T) = BasicResultRange!(T);
+alias Row(T) = BasicRow!(T);
 alias Value(T) = BasicValue!(T,ResultImpl!T);
 
 struct DefaultPolicy {
@@ -337,13 +291,12 @@ struct ConnectionImpl(T) {
 
 struct Describe(T) {
     int index;
-    string name;
-    //nd_mysql_type type;
-    uint type;
+    char[] name;
     MYSQL_FIELD *field;
 }
 
 struct Bind(T) {
+    ValueType type;
     int mysql_type;
     int allocSize;
     void[] data;
@@ -530,11 +483,9 @@ struct ResultImpl(T) {
             d.index = i;
             d.field = mysql_fetch_field(result_metadata);
 
-            //d.name = to!string(d.field.name);
-            const(char*) p = cast(const(char*)) d.field.name;
-            d.name = to!string(p[0 .. strlen(p)]);
-
-            //d.type = info[di.field.type].type;
+            //const(char*) p = cast(const(char*)) d.field.name;
+            char* p = cast(char*) d.field.name;
+            d.name = p[0 .. strlen(p)];
 
             info("describe: name: ", d.name, ", mysql type: ", d.field.type);
         }
@@ -551,6 +502,7 @@ struct ResultImpl(T) {
             bind ~= Bind();
             auto b = &bind.back();
 
+            b.type = ValueType.String;
             b.mysql_type = MYSQL_TYPE_STRING;
             b.allocSize = cast(uint)(d.field.length + 1);
             b.data = allocator.allocate(b.allocSize);
@@ -576,9 +528,9 @@ struct ResultImpl(T) {
         return false;
     }
 
-    // value getters (experimental design)
+    // value getters
 
-    static auto get(X:char[])(Bind *b) {
+    static char[] get(X:char[])(Bind *b) {
         auto ptr = cast(char*) b.data.ptr;
         return ptr[0..b.length];
     }
@@ -591,7 +543,10 @@ struct ResultImpl(T) {
         return *cast(int*) b.data.ptr;
     }
 
-    // improve design
+    static auto get(X:Date)(Bind *b) {
+        return Date(2016,1,1); // fix
+    }
+
     static void checkType(T)(Bind *b) {
         int x = TypeInfo!T.type();
         int y = b.mysql_type;
@@ -600,9 +555,10 @@ struct ResultImpl(T) {
         throw new DatabaseException("type mismatch");
     }
 
-    // clarify as a better 1-n bind mapping
+    // refactor as a better 1-n bind mapping
     struct TypeInfo(T:int) {static int type() {return MYSQL_TYPE_LONG;}}
     struct TypeInfo(T:string) {static int type() {return MYSQL_TYPE_STRING;}}
+    struct TypeInfo(T:Date) {static int type() {return MYSQL_TYPE_DATE;}}
 
 }
 

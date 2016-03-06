@@ -4,10 +4,11 @@ pragma(lib, "odbc");
 public import std.database.exception;
 public import std.database.resolver;
 public import std.database.pool;
-import std.database.odbc.sql;
-import std.database.odbc.sqltypes;
-import std.database.odbc.sqlext;
 import std.experimental.allocator.mallocator;
+import etc.c.odbc.sql;
+import etc.c.odbc.sqlext;
+import etc.c.odbc.sqltypes;
+import etc.c.odbc.sqlucode;
 
 import std.string;
 import core.stdc.stdlib;
