@@ -43,6 +43,7 @@ foreach (row; range) {
 }
 
 ```
+
 #### [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style select
 ```D
 import std.database.sqlite;
@@ -50,10 +51,10 @@ createDatabase("file:///demo.sqlite")
     .connection()
     .execute("select * from t1")
     .writeResult();
-    ```
+```
 
 #### field access
-    ```D
+```D
 import std.database.sqlite;
 auto db = createDatabase("file:///testdb");
 auto rowSet = db.connection().execute("select name,score from score");
@@ -71,27 +72,27 @@ createDatabase("file:///demo.sqlite")
     .connection()
     .execute("select * from t1 where score >= ?", minScore)
     .writeResult();
-    ```
+```
 
 #### insert with input binding
-    ```D
-    import std.database;
-    auto db = createDatabase("mydb");
-    auto con = db.connection();
-    auto stmt = con.statement("insert into table values(?,?)");
-    stmt.execute("a",1);
-    stmt.execute("b",2);
-    stmt.execute("c",3);
-    ```
+```D
+import std.database;
+auto db = createDatabase("mydb");
+auto con = db.connection();
+auto stmt = con.statement("insert into table values(?,?)");
+stmt.execute("a",1);
+stmt.execute("b",2);
+stmt.execute("c",3);
+```
 
 #### poly database setup (driver registration)
-    ```D
-    import std.database.poly;
-    Database.register!(std.database.sqlite.Database)();
-    Database.register!(std.database.mysql.Database)();
-    Database.register!(std.database.oracle.Database)();
-    auto db = createDatabase("mydb");
-    ```
+```D
+import std.database.poly;
+Database.register!(std.database.sqlite.Database)();
+Database.register!(std.database.mysql.Database)();
+Database.register!(std.database.oracle.Database)();
+auto db = createDatabase("mydb");
+```
 
 ## Status
 
