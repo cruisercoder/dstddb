@@ -190,9 +190,7 @@ struct BasicValue(T,Impl) {
     private Bind* bind_;
     alias Converter = .Converter!Impl;
 
-    this(Bind* bind) {
-        bind_ = bind;
-    }
+    this(Bind* bind) {bind_ = bind;}
 
     auto as(T:int)() {return Converter.convert!T(bind_);}
     auto as(T:string)() {return Converter.convert!T(bind_);}
@@ -203,6 +201,18 @@ struct BasicValue(T,Impl) {
         Impl.checkType!string(bind_);
         return Impl.get!(char[])(bind_); 
     }
+}
+
+struct EfficientValue(T,Impl) {
+    alias Bind = .Bind!T;
+    private Bind* bind_;
+    alias Converter = .Converter!Impl;
+
+    this(Bind* bind) {bind_ = bind;}
+
+    auto as(T:int)() {return Converter.convertDirect!T(bind_);}
+    auto as(T:string)() {return Converter.convertDirect!T(bind_);}
+    auto as(T:Date)() {return Converter.convertDirect!T(bind_);}
 }
 
 // -----------------------------------------------
