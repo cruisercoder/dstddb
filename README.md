@@ -97,10 +97,10 @@ createDatabase("file:///demo.sqlite")
 
     WIP
 
-    | Feature                      | sqlite | mysql  | oracle | odbc  | poly  |
-    | :--------------------------- | :----- | :----- | :----- | :---- | :---- |
-    | execute with no results      | y      | y      | y      | y     |       |
-    | select no-bind with results  | y      | y      | y      | y     |       |
-    | input binding (string only)  | y      | y      | y      |       |       |
-    | native column type buffers   |        |        |        |       |       |
+    | Feature                      | sqlite | mysql  | oracle | postgres | odbc  | poly  |
+    | :--------------------------- | :----- | :----- | :----- | :------  | :---- | :---- |
+    | command only execution       | y      | y      | y      | y        | y     |       |
+    | select no-bind with results  | y      | y      | y      | y        | y     |       |
+    | input binding (string only)  | y      | y      | y      | y        |       |       |
+    | native column type buffers   |        | y      |        |          |       |       |
 

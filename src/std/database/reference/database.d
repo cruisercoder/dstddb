@@ -2,7 +2,8 @@ module std.database.reference.database;
 
 import std.string;
 
-public import std.database.exception;
+import std.database.common;
+import std.database.exception;
 import std.container.array;
 import std.experimental.logger;
 import std.experimental.allocator.mallocator;
@@ -47,6 +48,8 @@ auto result(T)(Statement!T stmt) {
 
 struct Database(T) {
     alias Allocator = T.Allocator;
+
+    static const auto queryVariableType = QueryVariableType.QuestionMark;
 
 
     private struct Payload {

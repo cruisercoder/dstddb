@@ -8,6 +8,7 @@ import core.stdc.stdlib;
 import std.typecons;
 import etc.c.sqlite3;
 
+import std.database.common;
 import std.database.exception;
 import std.database.resolver;
 import std.database.allocator;
@@ -43,6 +44,8 @@ struct Database(T) {
     //alias Statement = .Statement;
     //alias PoolType = Pool!(Database!T,Connection!T);
     //PoolType pool_;
+
+    static const auto queryVariableType = QueryVariableType.QuestionMark;
 
     this(string defaultSource) {
         data_ = Data(defaultSource);

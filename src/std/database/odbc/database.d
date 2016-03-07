@@ -1,9 +1,10 @@
 module std.database.odbc.database;
 pragma(lib, "odbc");
 
-public import std.database.exception;
-public import std.database.resolver;
-public import std.database.pool;
+import std.database.common;
+import std.database.exception;
+import std.database.resolver;
+import std.database.pool;
 import std.experimental.allocator.mallocator;
 import etc.c.odbc.sql;
 import etc.c.odbc.sqlext;
@@ -36,6 +37,8 @@ auto createDatabase()(string defaultURI="") {
 struct Database(T) {
     alias Allocator = T.Allocator;
     //alias ConnectionPool = Pool!(Connection!T);
+
+    static const auto queryVariableType = QueryVariableType.QuestionMark;
 
     // temporary
 

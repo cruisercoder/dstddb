@@ -12,10 +12,12 @@ else {
 }
 
 import std.database.mysql.bindings;
+import std.database.common;
 import std.database.exception;
 import std.database.resolver;
 import std.database.allocator;
 import std.database.impl;
+import std.database.pool;
 import std.container.array;
 import std.experimental.logger;
 import std.string;
@@ -27,6 +29,9 @@ import std.typecons;
 
 struct BasicDatabase(T,Impl) {
     alias Allocator = T.Allocator;
+    //alias Pool = .Pool!(BasicDatabase,Connection!T); // no size error
+
+    static const auto queryVariableType = QueryVariableType.QuestionMark;
 
     // temporary
     auto connection() {return Connection!T(this);}
@@ -301,7 +306,7 @@ struct ConnectionImpl(T) {
 
 struct Describe(T) {
     int index;
-    char[] name;
+    immutable(char)[] name;
     MYSQL_FIELD *field;
 }
 
@@ -390,6 +395,7 @@ struct StatementImpl(T) {
                     mysql_stmt_bind_param(stmt, &mysqlBind[0]));
         }
 
+        info("execute: ", sql);
         check("mysql_stmt_execute", stmt, mysql_stmt_execute(stmt));
     }
 
@@ -493,8 +499,7 @@ struct ResultImpl(T) {
             d.index = i;
             d.field = mysql_fetch_field(result_metadata);
 
-            //const(char*) p = cast(const(char*)) d.field.name;
-            char* p = cast(char*) d.field.name;
+            auto p = cast(immutable(char)*) d.field.name;
             d.name = p[0 .. strlen(p)];
 
             info("describe: name: ", d.name, ", mysql type: ", d.field.type);

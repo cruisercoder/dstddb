@@ -54,6 +54,8 @@ struct Database(T=DefaultPolicy) {
     alias Allocator = T.Allocator;
     //alias Connection = .Connection!T;
 
+    static const auto queryVariableType = QueryVariableType.QuestionMark;
+
     this(string defaultURI) {
         data_ = Data(defaultURI);
     }
