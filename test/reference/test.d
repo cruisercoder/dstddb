@@ -14,10 +14,10 @@ unittest {
 
     auto con = db.connection("source");
 
-    con.execute("drop table t");
+    con.query("drop table t");
 
     auto stmt = statement(con, "select * from t");
-    auto res = stmt.execute();
+    auto res = stmt.query();
 
     auto range = res[];
 

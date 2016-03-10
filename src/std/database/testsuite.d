@@ -35,10 +35,10 @@ void databaseCreation(Database) (string source) {
 void simpleInsertSelect(D) (D db) {
     info("simpleInsertSelect");
     create_score_table(db, "score");
-    db.execute("insert into score values('Person',123)");
+    db.query("insert into score values('Person',123)");
 
     //writeResult(db.connection().statement("select * from score")); // maybe should work too?
-    writeResult(db.connection().statement("select * from score").execute());
+    writeResult(db.connection().statement("select * from score").query());
 
 }
 
@@ -47,7 +47,7 @@ void classicSelect(Database) (Database db) {
     string table = "t1";
     create_score_table(db, table);
     auto con = db.connection();
-    auto result = con.execute("select * from " ~ table);
+    auto result = con.query("select * from " ~ table);
     foreach (r; result[]) {
         for(int c = 0; c != r.columns; ++c) {
             if (c) write(",");
@@ -58,7 +58,7 @@ void classicSelect(Database) (Database db) {
 }
 
 void fieldAccess(Database)(Database db) {
-    auto rowSet = db.connection().execute("select name,score from score");
+    auto rowSet = db.connection().query("select name,score from score");
     foreach (r; rowSet) {
         writeln(r[0].as!string,",",r[1].as!int);
     }
@@ -73,7 +73,7 @@ void bindTest0(Database) (Database db) {
     create_score_table(db, "t1");
 
     QueryVariable!(Database.queryVariableType) v;
-    auto res = db.connection().execute("select name,score from t1 where score >= " ~ v.next(), 50);
+    auto res = db.connection().query("select name,score from t1 where score >= " ~ v.next(), 50);
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -90,7 +90,7 @@ void bindTest1(Database) (Database db) {
     QueryVariable!(Database.queryVariableType) v;
     auto stmt = db.connection().statement("select name,score from t1 where score >= " ~ v.next());
     //assert(stmt.binds() == 1); // prepare problem
-    auto res = stmt.execute(50);
+    auto res = stmt.query(50);
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -111,7 +111,7 @@ void bindTest2(Database) (Database db) {
                 "select name,score from t1 where score >= " ~ v.next() ~
                 " and score < " ~ v.next());
     // assert(stmt.binds() == 2); // fix
-    auto res = stmt.execute(50, 80);
+    auto res = stmt.query(50, 80);
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -129,10 +129,10 @@ void bindInsertTest(Database) (Database db) {
     auto stmt = con.statement(
             "insert into score values(" ~ v.next() ~
             "," ~ v.next() ~ ")");
-    stmt.execute("a",1);
-    stmt.execute("b",2);
-    stmt.execute("c",3);
-    con.execute("select * from score").writeResult();
+    stmt.query("a",1);
+    stmt.query("b",2);
+    stmt.query("c",3);
+    con.query("select * from score").writeResult();
 }
 
 void cascadeTest(Database) (Database db) {
@@ -140,7 +140,7 @@ void cascadeTest(Database) (Database db) {
     writeln("cascade write_result test");
     db
         .connection()
-        .execute("select * from t1")
+        .query("select * from t1")
         .writeResult();
     writeln();
 } 
@@ -161,10 +161,10 @@ void polyTest(DB) (string source) {
 
 
 void drop_table(D) (D db, string table) {
-    //db.execute("drop table if exists " ~ table ~ ";");
+    //db.query("drop table if exists " ~ table ~ ";");
     try {
         info("drop table:  ", table);
-        db.execute("drop table " ~ table);
+        db.query("drop table " ~ table);
     } catch (Exception e) {
         info("drop table error (ignored): ", e.msg);
     }
@@ -173,9 +173,9 @@ void drop_table(D) (D db, string table) {
 void create_simple_table(DB) (DB db, string table) {
     import std.conv;
     Db.Connection con = db.connection();
-    con.execute("create table " ~ table ~ "(a integer, b integer)");
+    con.query("create table " ~ table ~ "(a integer, b integer)");
     for(int i = 0; i != 10; ++i) {
-        con.execute("insert into " ~ table ~ " values(1," ~ to!string(i) ~ ")");
+        con.query("insert into " ~ table ~ " values(1," ~ to!string(i) ~ ")");
     }
 }
 
@@ -186,11 +186,11 @@ void create_score_table(DB) (DB db, string table, bool data = true) {
     auto scores = [62, 48, 84];
 
     db.drop_table(table);
-    con.execute("create table " ~ table ~ "(name varchar(10), score integer)");
+    con.query("create table " ~ table ~ "(name varchar(10), score integer)");
 
     if (!data) return;
     for(int i = 0; i != names.length; ++i) {
-        con.execute(
+        con.query(
                 "insert into " ~ table ~ " values(" ~
                 "'" ~ names[i] ~ "'" ~ "," ~ to!string(scores[i]) ~ ")");
     }

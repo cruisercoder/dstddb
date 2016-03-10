@@ -22,11 +22,11 @@ Available in [DUB](https://code.dlang.org/packages/dstddb), the D package regist
 
 ## Examples
 
-#### simple execute
+#### simple query
 ```D
 import std.database.mysql;
 auto db = createDatabase("mysql://database");
-db.execute("insert into table('name',123)");
+db.query("insert into table('name',123)");
 ```
 
 #### expanded classic style select
@@ -35,7 +35,7 @@ import std.database.mysql;
 auto db = createDatabase("mysql://127.0.0.1/test");
 auto con = db.connection();
 auto stmt = con.statement("select * from table");
-auto rowSet = stmt.execute();
+auto rowSet = stmt.query();
 auto range = stmt[];
 foreach (row; range) {
     for(size_t col = 0; col != row.columns; ++col) write(rowr[col]), " ");
@@ -47,19 +47,19 @@ foreach (row; range) {
 ```D
 import std.database.sqlite;
 createDatabase("file:///demo.sqlite")
-    .connection()
-    .execute("select * from t1")
+.connection()
+    .query("select * from t1")
     .writeResult();
     ```
 
 #### field access
     ```D
-import std.database.sqlite;
-auto db = createDatabase("file:///testdb");
-auto rowSet = db.connection().execute("select name,score from score");
-foreach (r; rowSet) {
-    writeln(r[0].as!string,",",r[1].as!int);
-}
+    import std.database.sqlite;
+    auto db = createDatabase("file:///testdb");
+    auto rowSet = db.connection().query("select name,score from score");
+    foreach (r; rowSet) {
+        writeln(r[0].as!string,",",r[1].as!int);
+    }
 
 ```
 
@@ -68,8 +68,8 @@ foreach (r; rowSet) {
 import std.database.sqlite;
 int minScore = 50;
 createDatabase("file:///demo.sqlite")
-    .connection()
-    .execute("select * from t1 where score >= ?", minScore)
+.connection()
+    .query("select * from t1 where score >= ?", minScore)
     .writeResult();
     ```
 
@@ -79,9 +79,9 @@ createDatabase("file:///demo.sqlite")
     auto db = createDatabase("mydb");
     auto con = db.connection();
     auto stmt = con.statement("insert into table values(?,?)");
-    stmt.execute("a",1);
-    stmt.execute("b",2);
-    stmt.execute("c",3);
+    stmt.query("a",1);
+    stmt.query("b",2);
+    stmt.query("c",3);
     ```
 
 #### poly database setup (driver registration)
@@ -93,14 +93,18 @@ createDatabase("file:///demo.sqlite")
     auto db = createDatabase("mydb");
     ```
 
+### Notes
+
+- The reference implementations use logging (std.experimental.logger). To hide the info logging, add this line to your package.json file: "versions": ["StdLoggerDisableInfo"].
+
 ## Status
 
     WIP
 
-    | Feature                      | sqlite | mysql  | oracle | postgres | odbc  | poly  |
-    | :--------------------------- | :----- | :----- | :----- | :------  | :---- | :---- |
-    | command only execution       | y      | y      | y      | y        | y     |       |
-    | select no-bind with results  | y      | y      | y      | y        | y     |       |
-    | input binding (string only)  | y      | y      | y      | y        |       |       |
-    | native column type buffers   |        | y      |        |          |       |       |
+    | Feature                         | sqlite | mysql  | oracle | postgres | odbc  | poly  |
+    | :---------------------------    | :----- | :----- | :----- | :------  | :---- | :---- |
+    | command only execution          | y      | y      | y      | y        | y     |       |
+    | select no-bind with results     | y      | y      | y      | y        | y     |       |
+    | input binding (string/int only) | y      | y      | y      | y        |       |       |
+    | native column type buffers      |        | y      |        |          |       |       |
 

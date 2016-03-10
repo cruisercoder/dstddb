@@ -12,8 +12,8 @@ unittest {
 unittest {
     auto db = createDatabase("mysql://127.0.0.1/test");
     auto con = db.connection();
-    //con.statement("select * from score").execute[].writeResult();
-    con.execute("select * from score").writeResult();
+    //con.statement("select * from score").query[].writeResult();
+    con.query("select * from score").writeResult();
 }
 
 

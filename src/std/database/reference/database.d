@@ -85,8 +85,8 @@ struct Connection(T) {
 
     auto statement(string sql) {return Statement!T(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     package this(Database db, string source) {
         data_ = Data(db,source);
@@ -130,14 +130,14 @@ struct Statement(T) {
         data_ = Data(con,sql);
         //prepare();
         // must be able to detect binds in all DBs
-        //if (!data_.binds) execute();
+        //if (!data_.binds) query();
     }
 
     this(T...) (Connection con, string sql, T args) {
         data_ = Data(con,sql);
         //prepare();
         //bindAll(args);
-        //execute();
+        //query();
     }
 
     //string sql() {return data_.sql;}
@@ -174,12 +174,12 @@ struct Statement(T) {
     void exec() {}
     void prepare() {}
 
-    auto execute() {
+    auto query() {
         return result();
     }
 
-    auto execute(X...) (X args) {
-        return execute();
+    auto query(X...) (X args) {
+        return query();
     }
 
     private:

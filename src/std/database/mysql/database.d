@@ -36,7 +36,7 @@ struct BasicDatabase(T,Impl) {
     // temporary
     auto connection() {return Connection!T(this);}
     auto connection(string uri) {return Connection!T(this, uri);}
-    void execute(string sql) {connection().execute(sql);}
+    void query(string sql) {connection().query(sql);}
 
     bool bindable() {return true;}
 
@@ -66,8 +66,8 @@ struct BasicConnection(T,Impl) {
 
     auto statement(string sql) {return Statement!T(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
     private Data data_;
@@ -107,14 +107,14 @@ struct BasicStatement(T,Impl) {
     void bind(int n, int value) {data_.bind(n, value);}
     void bind(int n, const char[] value){data_.bind(n,value);}
 
-    auto execute() {
-        data_.execute();
+    auto query() {
+        data_.query();
         return result();
     }
 
-    auto execute(X...) (X args) {
+    auto query(X...) (X args) {
         bindAll(args);
-        return execute();
+        return query();
     }
 
     private:
@@ -383,7 +383,7 @@ struct StatementImpl(T) {
         binds = cast(uint) mysql_stmt_param_count(stmt);
     }
 
-    void execute() {
+    void query() {
 
         if (inputBind.length && !bindInit) {
             bindInit = true;

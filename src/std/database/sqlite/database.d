@@ -57,7 +57,7 @@ struct Database(T) {
     //auto connection(string uri) {return pool_.get(uri);}
     auto connection(string url="") {return Connection!T(this, url);}
     //auto connection() {return pool_.get();}
-    auto execute(string sql) {return this.connection().execute(sql);}
+    auto query(string sql) {return this.connection().query(sql);}
 
 
     bool bindable() {return true;}
@@ -92,8 +92,8 @@ struct Connection(T) {
     // temporary helper functions
     auto statement(string sql) {return Statement!T(this,sql);}
     //auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     void error(string msg, int ret) {throw_error(data_.sq, msg, ret);}
 
@@ -161,14 +161,14 @@ struct Statement(T) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        //if (!data_.binds) execute();
+        //if (!data_.binds) query();
     }
 
     /*
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
-        execute(args);
+        query(args);
     }
     */
 
@@ -205,7 +205,7 @@ struct Statement(T) {
 
     int binds() {return sqlite3_bind_parameter_count(data_.st);}
 
-    auto execute() {
+    auto query() {
         //if (data_.state == State.Execute) throw new DatabaseException("already executed"); // restore
         if (data_.state == State.Execute) return result();
         data_.state = State.Execute;
@@ -219,12 +219,12 @@ struct Statement(T) {
         return result();
     }
 
-    auto execute(T...) (T args) {
+    auto query(T...) (T args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        return execute();
+        return query();
     }
 
     bool hasRows() {

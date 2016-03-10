@@ -54,7 +54,7 @@ struct Database(T) {
 
     //ConnectionPool pool;
 
-    void execute(string sql) {connection().execute(sql);}
+    void query(string sql) {connection().query(sql);}
 
     bool bindable() {return false;}
 
@@ -134,8 +134,8 @@ struct Connection(T) {
     // temporary helper functions
     auto statement(string sql) {return Statement!T(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(string sql, T...) (T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(string sql, T...) (T args) {return statement(sql).query(args);}
 
     package this(Database!T db, string source="") {
         data_ = Data(db,source);
@@ -206,7 +206,7 @@ struct Statement(T) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        //if (!data_.binds) execute();
+        //if (!data_.binds) query();
     }
 
     this(X...) (Connection!T con, string sql, X args) {
@@ -318,7 +318,7 @@ struct Statement(T) {
 
     public:
 
-    void execute() {
+    void query() {
         if (!data_.binds) {
             info("sql execute direct: ", data_.sql);
             check("SQLExecDirect", SQLExecDirect(
@@ -332,12 +332,12 @@ struct Statement(T) {
         }
     }
 
-    void execute(X...) (X args) {
+    void query(X...) (X args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        execute();
+        query();
     }
 
     private:

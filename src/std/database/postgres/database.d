@@ -41,7 +41,7 @@ struct Database(T=DefaultPolicy) {
     // temporary
     auto connection() {return Connection!T(this);}
     auto connection(string uri) {return Connection!T(this, uri);}
-    void execute(string sql) {connection().execute(sql);}
+    void query(string sql) {connection().query(sql);}
 
     bool bindable() {return true;}
 
@@ -73,8 +73,8 @@ struct Connection(T) {
     // temporary
     auto statement (string sql) { return Statement!T(this, sql); }
     auto statement(X...) (string sql, X args) {return Statement!T(this, sql, args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     package this(Database!T db, string source="") {
         data_ = Data(db,source);
@@ -184,8 +184,8 @@ struct Statement(T) {
             }
         }
 
-        void execute() {
-            info("execute sql: ", sql);
+        void query() {
+            info("query sql: ", sql);
 
             if (0) {
                 if (!prepareRes) prepare();
@@ -210,8 +210,8 @@ struct Statement(T) {
             // if (!PQsetSingleRowMode(con)) throw error("PQsetSingleRowMode");
         }
 
-        void execute(X...) (X args) {
-            info("execute sql: ", sql);
+        void query(X...) (X args) {
+            info("query sql: ", sql);
 
             // todo: stack allocation
 
@@ -298,13 +298,13 @@ struct Statement(T) {
 
     public:
 
-    auto execute() {
-        data_.execute();
+    auto query() {
+        data_.query();
         return result();
     }
 
-    auto execute(X...) (X args) {
-        data_.execute(args);
+    auto query(X...) (X args) {
+        data_.query(args);
         return result();
     }
 

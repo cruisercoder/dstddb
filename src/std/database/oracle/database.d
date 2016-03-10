@@ -7,10 +7,11 @@ import core.stdc.stdlib;
 import std.conv;
 import std.experimental.allocator.mallocator;
 
-public import std.database.oracle.bindings;
-public import std.database.exception;
-public import std.database.resolver;
-public import std.database.allocator;
+import std.database.oracle.bindings;
+import std.database.common;
+import std.database.exception;
+import std.database.resolver;
+import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
 
@@ -63,7 +64,7 @@ struct Database(T=DefaultPolicy) {
     // temporary
     auto connection() {return Connection!T(this);}
     auto connection(string uri) {return Connection!T(this, uri);}
-    void execute(string sql) {connection().execute(sql);}
+    void query(string sql) {connection().query(sql);}
 
     bool bindable() {return false;}
 
@@ -121,8 +122,8 @@ struct Connection(T) {
     // temporary
     auto statement (string sql) { return Statement!T(this, sql); }
     auto statement(X...) (string sql, X args) {return Statement!T(this, sql, args);}
-    auto execute(string sql) {return statement(sql).execute();}
-    auto execute(T...) (string sql, T args) {return statement(sql).execute(args);}
+    auto query(string sql) {return statement(sql).query();}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     package this(Database!T db, string source="") {
         data_ = Data(db,source);
@@ -226,14 +227,14 @@ struct Statement(T) {
         data_ = Data(con,sql);
         prepare();
         // must be able to detect binds in all DBs
-        //if (!data_.binds) execute();
+        //if (!data_.binds) query();
     }
 
     this(X...) (Connection!T con, string sql, X args) {
         data_ = Data(con,sql);
         prepare();
         bindAll(args);
-        //execute();
+        //query();
     }
 
     string sql() {return data_.sql;}
@@ -371,7 +372,7 @@ struct Statement(T) {
 
     public:
 
-    auto execute() {
+    auto query() {
         ub4 iters = data_.stmt_type == OCI_STMT_SELECT ? 0:1;
         info("iters: ", iters);
         info("execute sql: ", data_.sql);
@@ -388,12 +389,12 @@ struct Statement(T) {
         return result();
     }
 
-    auto execute(X...) (X args) {
+    auto query(X...) (X args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
         }
-        return execute();
+        return query();
     }
 
     private:

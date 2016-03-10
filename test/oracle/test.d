@@ -24,13 +24,13 @@ unittest {
     auto con = db.connection();
 
     try {
-        con.execute("drop table t");
+        con.query("drop table t");
     } catch (Exception e) {
     }
 
-    con.execute("create table t(name varchar(20), age int)");
-    con.execute("insert into t values('Bob',12)");
-    con.execute("insert into t values('Joe',9)");
+    con.query("create table t(name varchar(20), age int)");
+    con.query("insert into t values('Bob',12)");
+    con.query("insert into t values('Joe',9)");
 
     con.statement("select * from t");
     //auto res = result(stmt);

@@ -10,13 +10,13 @@ unittest {
 
     //auto db = database("sqlite");
     //auto con = db.connection();
-    //con.execute("create table score(name varchar(10), score integer)");
+    //con.query("create table score(name varchar(10), score integer)");
 }
 
 unittest {
     auto db = createDatabase("path:///testdb");
-    //auto rowSet = db.connection().statement("select name,score from score").execute;
-    auto rowSet = db.connection().execute("select name,score from score");
+    //auto rowSet = db.connection().statement("select name,score from score").query;
+    auto rowSet = db.connection().query("select name,score from score");
     foreach (r; rowSet) {
         writeln(r[0].as!string,",",r[1].as!int);
         //writeln(r[0],", ",r[1]);
