@@ -31,7 +31,7 @@ void perf1() {
         auto stmt = con.statement(
                 "insert into tuple values(" ~ v.next() ~ "," ~ v.next() ~ "," ~ v.next() ~ ")");
 
-        for(int i = 0; i != 1000000; ++i) {
+        for(int i = 0; i != 1000; ++i) {
             if ((i % 10000) ==0) warning(i);
             stmt.query(i, i+1, i+2);
         }

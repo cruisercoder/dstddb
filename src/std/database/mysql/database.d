@@ -1,7 +1,6 @@
 module std.database.mysql.database;
 import std.conv;
 import core.stdc.config;
-import std.experimental.allocator.mallocator;
 import std.datetime;
 
 version(Windows) {
@@ -442,15 +441,15 @@ struct StatementImpl(T) {
 
     static void check(string msg, MYSQL_STMT* stmt, int ret) {
         info(msg, ":", ret);
-        if (ret) error(msg,stmt,ret);
+        if (ret) createError(msg,stmt,ret);
     }
 
-    static void error(string msg, MYSQL_STMT* stmt, int ret) {
+    static void createError(string msg, MYSQL_STMT* stmt, int ret) {
         info(msg, ":", ret);
         if (!ret) return;
         import core.stdc.string: strlen;
         const(char*) err = mysql_stmt_error(stmt);
-        info("error: ", err[0..strlen(err)]); //fix
+        //info("error: ", err[0..strlen(err)]); //fix
         throw new DatabaseException("mysql error: " ~ msg);
     }
 }
@@ -552,7 +551,7 @@ struct ResultImpl(T) {
             throw new DatabaseException("fetch: database truncation");
         }
 
-        stmt.error("mysql_stmt_fetch",stmt.data_.stmt,status);
+        StatementImpl!T.createError("mysql_stmt_fetch",stmt.data_.stmt,status);
         return false;
     }
 

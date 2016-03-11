@@ -1,5 +1,4 @@
 module std.database.sqlite.database;
-import std.experimental.allocator.mallocator;
 
 pragma(lib, "sqlite3");
 

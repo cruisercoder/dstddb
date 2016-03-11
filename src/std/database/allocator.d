@@ -1,9 +1,9 @@
 module std.database.allocator;
-import std.experimental.allocator.common;
+//import std.experimental.allocator.common;
 import std.experimental.logger;
 
 struct MyMallocator {
-    enum uint alignment = platformAlignment;
+    //enum uint alignment = platformAlignment;
 
     @trusted // removed @nogc and nothrow for logging
     void[] allocate(size_t bytes) {

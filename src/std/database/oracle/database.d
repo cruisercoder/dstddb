@@ -1,11 +1,10 @@
 module std.database.oracle.database;
 pragma(lib, "occi");
-pragma(lib, "clintsh");
+pragma(lib, "clntsh");
 
 import std.string;
 import core.stdc.stdlib;
 import std.conv;
-import std.experimental.allocator.mallocator;
 
 import std.database.oracle.bindings;
 import std.database.common;

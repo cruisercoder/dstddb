@@ -3,7 +3,6 @@ pragma(lib, "pq");
 
 import std.string;
 import core.stdc.stdlib;
-import std.experimental.allocator.mallocator;
 
 import std.database.postgres.bindings;
 import std.database.common;

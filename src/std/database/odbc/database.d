@@ -5,7 +5,6 @@ import std.database.common;
 import std.database.exception;
 import std.database.resolver;
 import std.database.pool;
-import std.experimental.allocator.mallocator;
 import etc.c.odbc.sql;
 import etc.c.odbc.sqlext;
 import etc.c.odbc.sqltypes;

@@ -6,7 +6,6 @@ import std.database.common;
 import std.database.exception;
 import std.container.array;
 import std.experimental.logger;
-import std.experimental.allocator.mallocator;
 
 public import std.database.allocator;
 
