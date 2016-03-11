@@ -201,11 +201,15 @@ struct BasicValue(T,Impl) {
     auto as(T:string)() {return Converter.convert!T(bind_);}
     auto as(T:Date)() {return Converter.convert!T(bind_);}
 
+    /*
     //inout(char)[]
     char[] chars() {
         Impl.checkType!string(bind_);
         return Impl.get!(char[])(bind_); 
     }
+    */
+
+    auto chars() {return as!string();}
 }
 
 struct EfficientValue(T,Impl) {
@@ -232,6 +236,7 @@ alias Result(T) = BasicResult!(T,ResultImpl!T);
 alias ResultRange(T) = BasicResultRange!(T);
 alias Row(T) = BasicRow!(T);
 alias Value(T) = BasicValue!(T,ResultImpl!T);
+//alias Value(T) = EfficientValue!(T,ResultImpl!T);
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -428,6 +433,7 @@ struct StatementImpl(T) {
         if (idx > inputBind.length) throw new DatabaseException("bind range error");
         if (idx == inputBind.length) inputBind ~= Bind();
         auto b = &inputBind[idx];
+        if (allocSize <= b.data.length) return b; // fix
         b.mysql_type = mysql_type;
         b.allocSize = allocSize;
         b.data = allocator.allocate(b.allocSize);
@@ -517,8 +523,15 @@ struct ResultImpl(T) {
             bind ~= Bind();
             auto b = &bind.back();
 
-            b.type = ValueType.String;
-            b.mysql_type = MYSQL_TYPE_STRING;
+            // let in ints for now
+            if (d.field.type == MYSQL_TYPE_LONG) {
+                b.mysql_type = d.field.type;
+                b.type = ValueType.Int;
+            } else {
+                b.mysql_type = MYSQL_TYPE_STRING;
+                b.type = ValueType.String;
+            }
+
             b.allocSize = cast(uint)(d.field.length + 1);
             b.data = allocator.allocate(b.allocSize);
         }
@@ -566,7 +579,7 @@ struct ResultImpl(T) {
         int x = TypeInfo!T.type();
         int y = b.mysql_type;
         if (x == y) return;
-        info("type pair mismatch: ",x, ":", y);
+        warning("type pair mismatch: ",x, ":", y);
         throw new DatabaseException("type mismatch");
     }
 

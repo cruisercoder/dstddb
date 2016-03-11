@@ -32,7 +32,7 @@ struct Converter(T) {
         return value;
     }
 
-    static Y convertDirect()(Bind *b) {
+    static Y convertDirect(Y)(Bind *b) {
         assert(b.type == TypeInfo!Y.type);
         return Impl.get!Y(b);
     }
