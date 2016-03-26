@@ -154,8 +154,6 @@ struct Statement(T) {
     auto result() {return Result!T(this);} // private?
     auto opSlice() {return result().opSlice();}
 
-    void error(string msg, int ret) {data_.con.error(msg, ret);}
-
     this(Connection!T con, string sql) {
         data_ = Data(con,sql);
         prepare();
@@ -164,57 +162,21 @@ struct Statement(T) {
     }
 
     /*
-    this(X...) (Connection!T con, string sql, X args) {
-        data_ = Data(con,sql);
-        prepare();
-        query(args);
-    }
-    */
+       this(X...) (Connection!T con, string sql, X args) {
+       data_ = Data(con,sql);
+       prepare();
+       query(args);
+       }
+     */
 
     string sql() {return data_.sql;}
 
-    void bind(int col, int value){
-        int rc = sqlite3_bind_int(
-                data_.st, 
-                col,
-                value);
-        if (rc != SQLITE_OK) {
-            throw_error("sqlite3_bind_int");
-        }
-    }
-
-    void bind(int col, const char[] value){
-        if(value is null) {
-            int rc = sqlite3_bind_null(data_.st, col);
-            if (rc != SQLITE_OK) throw_error("bind1");
-        } else {
-            //cast(void*)-1);
-            int rc = sqlite3_bind_text(
-                    data_.st, 
-                    col,
-                    value.ptr,
-                    cast(int) value.length,
-                    null);
-            if (rc != SQLITE_OK) {
-                writeln(rc);
-                throw_error("bind2");
-            }
-        }
-    }
-
-    int binds() {return sqlite3_bind_parameter_count(data_.st);}
+    void bind(int col, int value) {data_.bind(col, value);}
+    void bind(int col, const char[] value) {data_.bind(col, value);}
+    int binds() {return data_.binds();}
 
     auto query() {
-        //if (data_.state == State.Execute) throw new DatabaseException("already executed"); // restore
-        if (data_.state == State.Execute) return result();
-        data_.state = State.Execute;
-        int status = sqlite3_step(data_.st);
-        info("sqlite3_step: status: ", status);
-        if (status == SQLITE_ROW) {
-            data_.hasRows = true;
-        } else if (status == SQLITE_DONE) {
-            reset();
-        } else throw new DatabaseException("step error");
+        data_.query();
         return result();
     }
 
@@ -226,9 +188,7 @@ struct Statement(T) {
         return query();
     }
 
-    bool hasRows() {
-        return data_.hasRows;
-    }
+    bool hasRows() {return data_.hasRows;}
 
     private:
 
@@ -239,7 +199,7 @@ struct Statement(T) {
         sqlite3* sq;
         sqlite3_stmt *st;
         bool hasRows;
-        int binds;
+        int binds_;
 
         this(Connection!T con_, string sql_) {
             con = con_;
@@ -256,6 +216,70 @@ struct Statement(T) {
             }
         }
 
+        void bind(int col, int value){
+            int rc = sqlite3_bind_int(
+                    st, 
+                    col,
+                    value);
+            if (rc != SQLITE_OK) {
+                throw_error("sqlite3_bind_int");
+            }
+        }
+
+        void bind(int col, const char[] value){
+            if(value is null) {
+                int rc = sqlite3_bind_null(st, col);
+                if (rc != SQLITE_OK) throw_error("bind1");
+            } else {
+                //cast(void*)-1);
+                int rc = sqlite3_bind_text(
+                        st, 
+                        col,
+                        value.ptr,
+                        cast(int) value.length,
+                        null);
+                if (rc != SQLITE_OK) {
+                    writeln(rc);
+                    throw_error("bind2");
+                }
+            }
+        }
+
+        int binds() {return binds_;}
+
+        void prepare() {
+            if (!st) { 
+                int res = sqlite3_prepare_v2(
+                        sq, 
+                        toStringz(sql), 
+                        cast(int) sql.length + 1, 
+                        &st, 
+                        null);
+                if (res != SQLITE_OK) error("prepare", res);
+                binds_ = sqlite3_bind_parameter_count(st);
+            }
+        }
+
+        void query() {
+            //if (state == State.Execute) throw new DatabaseException("already executed"); // restore
+            if (state == State.Execute) return;
+            state = State.Execute;
+            int status = sqlite3_step(st);
+            info("sqlite3_step: status: ", status);
+            if (status == SQLITE_ROW) {
+                hasRows = true;
+            } else if (status == SQLITE_DONE) {
+                reset();
+            } else throw new DatabaseException("step error");
+        }
+
+        void reset() {
+            int status = sqlite3_reset(st);
+            if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
+        }
+
+        void error(string msg, int ret) {con.error(msg, ret);}
+
         this(this) { assert(false); }
         void opAssign(Statement.Payload rhs) { assert(false); }
     }
@@ -263,24 +287,8 @@ struct Statement(T) {
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     private Data data_;
 
-
-    void prepare() {
-        if (!data_.st) { 
-            int res = sqlite3_prepare_v2(
-                    data_.sq, 
-                    toStringz(data_.sql), 
-                    cast(int) data_.sql.length + 1, 
-                    &data_.st, 
-                    null);
-            if (res != SQLITE_OK) error("prepare", res);
-            data_.binds = sqlite3_bind_parameter_count(data_.st);
-        }
-    }
-
-    void reset() {
-        int status = sqlite3_reset(data_.st);
-        if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
-    }
+    void prepare() {data_.prepare();}
+    void reset() {data_.reset();}
 
 }
 

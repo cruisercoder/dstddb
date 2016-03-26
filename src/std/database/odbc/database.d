@@ -61,33 +61,6 @@ struct Database(T) {
         data_ = Data(defaultURI);
     }
 
-    void showDrivers() {
-        import core.stdc.string: strlen;
-
-        SQLUSMALLINT direction;
-
-        SQLCHAR[256] driver;
-        SQLCHAR[256] attr;
-        SQLSMALLINT driver_ret;
-        SQLSMALLINT attr_ret;
-        SQLRETURN ret;
-
-        direction = SQL_FETCH_FIRST;
-        info("DRIVERS:");
-        while(SQL_SUCCEEDED(ret = SQLDrivers(
-                        data_.env, 
-                        direction,
-                        driver.ptr, 
-                        driver.sizeof, 
-                        &driver_ret,
-                        attr.ptr, 
-                        attr.sizeof, 
-                        &attr_ret))) {
-            direction = SQL_FETCH_NEXT;
-            info(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
-            //if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
-        }
-    }
 
     private:
 
@@ -119,6 +92,34 @@ struct Database(T) {
 
         this(this) { assert(false); }
         void opAssign(Database.Payload rhs) { assert(false); }
+
+        void showDrivers() {
+            import core.stdc.string: strlen;
+
+            SQLUSMALLINT direction;
+
+            SQLCHAR[256] driver;
+            SQLCHAR[256] attr;
+            SQLSMALLINT driver_ret;
+            SQLSMALLINT attr_ret;
+            SQLRETURN ret;
+
+            direction = SQL_FETCH_FIRST;
+            info("DRIVERS:");
+            while(SQL_SUCCEEDED(ret = SQLDrivers(
+                            env, 
+                            direction,
+                            driver.ptr, 
+                            driver.sizeof, 
+                            &driver_ret,
+                            attr.ptr, 
+                            attr.sizeof, 
+                            &attr_ret))) {
+                direction = SQL_FETCH_NEXT;
+                info(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
+                //if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
+            }
+        }
     }
 
     alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
@@ -217,54 +218,10 @@ struct Statement(T) {
     string sql() {return data_.sql;}
     int binds() {return data_.binds;}
 
-    void bind(int n, int value) {
-        info("input bind: n: ", n, ", value: ", value);
-
-        Bind b;
-        b.type = SQL_C_LONG;
-        b.dbtype = SQL_INTEGER;
-        b.size = SQLINTEGER.sizeof;
-        b.allocSize = b.size;
-        b.data = cast(void*)(data_.allocator.allocate(b.allocSize));
-        inputBind(n, b);
-
-        *(cast(SQLINTEGER*) data_.inputBind[n-1].data) = value;
-    }
-
-    void bind(int n, const char[] value){
-        import core.stdc.string: strncpy;
-        info("input bind: n: ", n, ", value: ", value);
-        // no null termination needed
-
-        Bind b;
-        b.type = SQL_C_CHAR;
-        b.dbtype = SQL_CHAR;
-        b.size = cast(SQLSMALLINT) value.length;
-        b.allocSize = b.size;
-        b.data = cast(void*)(data_.allocator.allocate(b.allocSize));
-        inputBind(n, b);
-
-        strncpy(cast(char*) b.data, value.ptr, b.size);
-    }
+    void bind(int n, int value) {data_.bind(n, value);}
+    void bind(int n, const char[] value) {data_.bind(n, value);}
 
     private:
-
-    void inputBind(int n, ref Bind bind) {
-        data_.inputBind ~= bind;
-        auto b = &data_.inputBind.back();
-
-        check("SQLBindParameter", SQLBindParameter(
-                    data_.stmt,
-                    cast(SQLSMALLINT) n,
-                    SQL_PARAM_INPUT,
-                    b.type,
-                    b.dbtype,
-                    0,
-                    0,
-                    b.data,
-                    b.allocSize,
-                    null));
-    }
 
     struct Payload {
         Connection!T con;
@@ -273,7 +230,7 @@ struct Statement(T) {
         SQLHSTMT stmt;
         bool hasRows;
         int binds;
-        Array!Bind inputBind;
+        Array!Bind inputbind_;
 
         this(Connection!T con_, string sql_) {
             con = con_;
@@ -283,8 +240,8 @@ struct Statement(T) {
         }
 
         ~this() {
-            for(int i = 0; i < inputBind.length; ++i) {
-                allocator.deallocate(inputBind[i].data[0..inputBind[i].allocSize]);
+            for(int i = 0; i < inputbind_.length; ++i) {
+                allocator.deallocate(inputbind_[i].data[0..inputbind_[i].allocSize]);
             }
             if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
             // stmt = null? needed
@@ -292,43 +249,98 @@ struct Statement(T) {
 
         this(this) { assert(false); }
         void opAssign(Statement.Payload rhs) { assert(false); }
+
+
+        void bind(int n, int value) {
+            info("input bind: n: ", n, ", value: ", value);
+
+            Bind b;
+            b.type = SQL_C_LONG;
+            b.dbtype = SQL_INTEGER;
+            b.size = SQLINTEGER.sizeof;
+            b.allocSize = b.size;
+            b.data = cast(void*)(allocator.allocate(b.allocSize));
+            inputBind(n, b);
+
+            *(cast(SQLINTEGER*) inputbind_[n-1].data) = value;
+        }
+
+        void bind(int n, const char[] value){
+            import core.stdc.string: strncpy;
+            info("input bind: n: ", n, ", value: ", value);
+            // no null termination needed
+
+            Bind b;
+            b.type = SQL_C_CHAR;
+            b.dbtype = SQL_CHAR;
+            b.size = cast(SQLSMALLINT) value.length;
+            b.allocSize = b.size;
+            b.data = cast(void*)(allocator.allocate(b.allocSize));
+            inputBind(n, b);
+
+            strncpy(cast(char*) b.data, value.ptr, b.size);
+        }
+
+        void inputBind(int n, ref Bind bind) {
+            inputbind_ ~= bind;
+            auto b = &inputbind_.back();
+
+            check("SQLBindParameter", SQLBindParameter(
+                        stmt,
+                        cast(SQLSMALLINT) n,
+                        SQL_PARAM_INPUT,
+                        b.type,
+                        b.dbtype,
+                        0,
+                        0,
+                        b.data,
+                        b.allocSize,
+                        null));
+        }
+
+
+        void prepare() {
+            //if (!data_.st)
+            check("SQLPrepare", SQLPrepare(
+                        stmt,
+                        cast(SQLCHAR*) toStringz(sql),
+                        SQL_NTS));
+
+            SQLSMALLINT v;
+            check("SQLNumParams", SQLNumParams(stmt, &v));
+            binds = v;
+            check("SQLNumResultCols", SQLNumResultCols (stmt, &v));
+            info("binds: ", binds);
+        }
+
+        void query() {
+            if (!binds) {
+                info("sql execute direct: ", sql);
+                check("SQLExecDirect", SQLExecDirect(
+                            stmt,
+                            cast(SQLCHAR*) toStringz(sql),
+                            SQL_NTS));
+            } else {
+                info("sql execute prepared: ", sql);
+                SQLRETURN ret = SQLExecute(stmt);
+                check("SQLExecute()", SQL_HANDLE_STMT, stmt, ret);
+            }
+        }
+
+        void exec() {
+            check("SQLExecDirect", SQLExecDirect(stmt,cast(SQLCHAR*) toStringz(sql), SQL_NTS));
+        }
+
+
     }
 
     alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     Data data_;
 
-    void exec() {
-        check("SQLExecDirect", SQLExecDirect(data_.stmt,cast(SQLCHAR*) toStringz(data_.sql), SQL_NTS));
-    }
-
-    void prepare() {
-        //if (!data_.st)
-        check("SQLPrepare", SQLPrepare(
-                    data_.stmt,
-                    cast(SQLCHAR*) toStringz(data_.sql),
-                    SQL_NTS));
-
-        SQLSMALLINT v;
-        check("SQLNumParams", SQLNumParams(data_.stmt, &v));
-        data_.binds = v;
-        check("SQLNumResultCols", SQLNumResultCols (data_.stmt, &v));
-        info("binds: ", data_.binds);
-    }
-
-    public:
+    void prepare() {data_.prepare();}
 
     void query() {
-        if (!data_.binds) {
-            info("sql execute direct: ", data_.sql);
-            check("SQLExecDirect", SQLExecDirect(
-                        data_.stmt,
-                        cast(SQLCHAR*) toStringz(data_.sql),
-                        SQL_NTS));
-        } else {
-            info("sql execute prepared: ", data_.sql);
-            SQLRETURN ret = SQLExecute(data_.stmt);
-            check("SQLExecute()", SQL_HANDLE_STMT, data_.stmt, ret);
-        }
+        data_.query();
     }
 
     void query(X...) (X args) {
