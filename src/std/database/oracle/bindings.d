@@ -57,11 +57,14 @@ enum OCI_DTYPE_PARAM = 53;
 // from ocidfn.h
 enum SQLT_INT = 3;
 enum SQLT_STR = 5;
+enum SQLT_DAT = 12;
 
+enum SQLT_ODT = 156;
 
 extern(System) {
     /* typedef */ alias void* dvoid;
     /* typedef */ alias int sword;
+    /* typedef */ alias ubyte ub1;
     /* typedef */ alias ushort ub2;
     /* typedef */ alias short sb2;
     /* typedef */ alias uint ub4;
@@ -76,6 +79,7 @@ extern(System) {
     struct OCISnapshot;
     struct OCIParam;
     struct OCIDefine;
+    struct OCIDateTime;
 
     sword OCIEnvCreate (
             OCIEnv **envhpp,
@@ -119,6 +123,24 @@ extern(System) {
     sword OCIDefineByPos (OCIStmt *stmtp, OCIDefine **defnp, OCIError *errhp,
             ub4 position, void  *valuep, sb4 value_sz, ub2 dty,
             void  *indp, ub2 *rlenp, ub2 *rcodep, ub4 mode);
-}
 
+    sword OCIDateTimeGetDate(void *hndl, OCIError *err,  const OCIDateTime *date,
+            sb2 *year, ub1 *month, ub1 *day );
+
+    // from orl.h
+
+    struct OCITime {
+        ub1 OCITimeHH;                          /* hours; range is 0 <= hours <=23 */
+        ub1 OCITimeMI;                     /* minutes; range is 0 <= minutes <= 59 */
+        ub1 OCITimeSS;                     /* seconds; range is 0 <= seconds <= 59 */
+    }
+
+    struct OCIDate {
+        sb2 OCIDateYYYY;         /* gregorian year; range is -4712 <= year <= 9999 */
+        ub1 OCIDateMM;                          /* month; range is 1 <= month < 12 */
+        ub1 OCIDateDD;                             /* day; range is 1 <= day <= 31 */
+        OCITime OCIDateTime;                                               /* time */
+    }
+
+}
 

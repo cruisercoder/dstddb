@@ -16,6 +16,7 @@ import std.experimental.logger;
 
 import std.stdio;
 import std.typecons;
+import std.datetime;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -47,7 +48,7 @@ void check()(string msg, sword status) {
 }
 
 //struct Database() {
-    //static auto create()(string uri="") {return Database!DefaultPolicy();}
+//static auto create()(string uri="") {return Database!DefaultPolicy();}
 //}
 
 struct Database(T=DefaultPolicy) {
@@ -524,12 +525,23 @@ struct Result(T) {
                 auto b = &bind.back();
                 auto d = &describe[i];
 
-                b.allocSize = cast(sb4) (d.size + 1);
-                b.data = cast(void*)(allocator.allocate(b.allocSize));
+                if (d.type == SQLT_DAT) {
+                    b.type = SQLT_ODT;
+                    //d.define_type = SQLT_ODT;
+                    b.allocSize = OCIDate.sizeof;
+                    b.data = cast(void*)(allocator.allocate(b.allocSize));
+                    emplace(cast(OCIDate*) b.data);
+                } else {
+                    b.type = SQLT_STR;
+                    b.allocSize = cast(sb4) (d.size + 1);
+                    b.data = cast(void*)(allocator.allocate(b.allocSize));
+                }
+
+                // initialize date?
+
                 GC.addRange(b.data, b.allocSize);
 
-                // just str for now
-                b.type = SQLT_STR;
+                log("bind: type: ", b.type, ", allocSize:", b.allocSize);
 
                 check("OCIDefineByPos", OCIDefineByPos(
                             stmt.data_.stmt,
@@ -596,6 +608,12 @@ struct Value(T) {
         check(bind_.type, SQLT_STR);
         auto ptr = cast(immutable char*) bind_.data;
         return cast(string) ptr[0..strlen(ptr)]; // fix with length
+    }
+
+    auto as(X:Date)() {
+        check(bind_.type, SQLT_ODT);
+        auto d = cast(OCIDate*) bind_.data;
+        return Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
     }
 
     //inout(char)[]

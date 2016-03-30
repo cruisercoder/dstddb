@@ -149,5 +149,21 @@ extern(System) {
     c_ulong mysql_stmt_param_count(MYSQL_STMT *);
 
     my_bool mysql_stmt_bind_param(MYSQL_STMT *, MYSQL_BIND *);
+
+    enum MYSQL_TIMESTAMP_TYPE {
+        MYSQL_TIMESTAMP_NONE    = -2,
+        MYSQL_TIMESTAMP_ERROR   = -1,
+        MYSQL_TIMESTAMP_DATE    =  0,
+        MYSQL_TIMESTAMP_DATETIME= 1,
+        MYSQL_TIMESTAMP_TIME    = 2
+    };
+
+    struct MYSQL_TIME {
+        uint  year, month, day, hour, minute, second;
+        uint  second_part;
+        my_bool neg;
+        MYSQL_TIMESTAMP_TYPE time_type;
+    };
+
 }
 

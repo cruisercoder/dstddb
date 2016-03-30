@@ -203,10 +203,10 @@ struct BasicValue(T,Impl) {
     /*
     //inout(char)[]
     char[] chars() {
-        Impl.checkType!string(bind_);
-        return Impl.get!(char[])(bind_); 
+    Impl.checkType!string(bind_);
+    return Impl.get!(char[])(bind_); 
     }
-    */
+     */
 
     auto chars() {return as!string();}
 }
@@ -526,6 +526,9 @@ struct ResultImpl(T) {
             if (d.field.type == MYSQL_TYPE_LONG) {
                 b.mysql_type = d.field.type;
                 b.type = ValueType.Int;
+            } else if (d.field.type == MYSQL_TYPE_DATE) {
+                b.mysql_type = d.field.type;
+                b.type = ValueType.Date;
             } else {
                 b.mysql_type = MYSQL_TYPE_STRING;
                 b.type = ValueType.String;
@@ -571,7 +574,10 @@ struct ResultImpl(T) {
     }
 
     static auto get(X:Date)(Bind *b) {
-        return Date(2016,1,1); // fix
+        //return Date(2016,1,1); // fix
+        MYSQL_TIME *t = cast(MYSQL_TIME*) b.data.ptr;
+        //t.year,t.month,t.day,t.hour,t.minute,t.second
+        return Date(t.year,t.month,t.day);
     }
 
     static void checkType(T)(Bind *b) {

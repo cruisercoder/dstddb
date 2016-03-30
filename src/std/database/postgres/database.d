@@ -1,5 +1,6 @@
 module std.database.postgres.database;
 pragma(lib, "pq");
+pragma(lib, "pgtypes");
 
 import std.string;
 import core.stdc.stdlib;
@@ -14,6 +15,7 @@ import std.experimental.logger;
 
 import std.stdio;
 import std.typecons;
+import std.datetime;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -186,10 +188,11 @@ struct Statement(T) {
         void query() {
             info("query sql: ", sql);
 
-            if (0) {
+            if (1) {
                 if (!prepareRes) prepare();
 
                 auto n = bindValue.length;
+                int resultFormat = 1;
 
                 res = PQexecPrepared(
                         con,
@@ -198,7 +201,7 @@ struct Statement(T) {
                         n ? cast(const char **) &bindValue[0] : null,
                         n ? cast(int*) &bindLength[0] : null,
                         n ? cast(int*) &bindFormat[0] : null,
-                        0);
+                        resultFormat);
 
             } else {
                 if (!PQsendQuery(con, toStringz(sql))) throw error("PQsendQuery");
@@ -523,17 +526,35 @@ struct Value(T) {
     }
 
     auto as(X:int)() {
-        import std.conv;
-        return to!X(as!string());
+        check(type,INT4OID);
+        auto p = cast(ubyte*) data;
+        return std.bitmanip.bigEndianToNative!int(p[0..int.sizeof]);
     }
 
     auto as(X:string)() {
+        check(type,VARCHAROID);
         immutable char *ptr = cast(immutable char*) data;
         return cast(string) ptr[0..len];
     }
 
+    auto as(X:Date)() {
+        check(type,DATEOID);
+        auto p = cast(ubyte*) data;
+        int date = std.bitmanip.bigEndianToNative!uint(p[0..uint.sizeof]);
+        int[3] mdy;
+        PGTYPESdate_julmdy(date, &mdy[0]);
+        return Date(mdy[2],mdy[0],mdy[1]);
+    }
+
     auto chars() {
-        return (cast(char*) data)[0..len];
+        // hack just to have working for now
+        import std.conv;
+        switch(type) {
+            case INT4OID: return to!string(as!int);
+            case VARCHAROID: return as!string;
+            case DATEOID: return to!string(as!Date);
+            default: throw new DatabaseException("not supported");
+        }
     }
 
     private:
@@ -543,6 +564,10 @@ struct Value(T) {
     int type() {return result.data_.describe[column].type;}
     int fmt() {return result.data_.describe[column].fmt;}
     int len() {return PQgetlength(result.data_.res, result.data_.row, column);}
+
+    void check(int a, int b) {
+        if (a != b) throw new DatabaseException("type mismatch");
+    }
 
 }
 

@@ -1,8 +1,27 @@
 module std.database.postgres.bindings;
 import core.stdc.config;
 
-
 extern(System) {
+
+    // from server/catalog/pg_type.h
+    enum int BOOLOID = 16;
+    enum int BYTEAOI = 17;
+    enum int CHAROID = 18;
+    enum int NAMEOID = 19;
+    enum int INT8OID = 20;
+    enum int INT2OID = 21;
+    enum int INT2VECTOROID = 22;
+    enum int INT4OID = 23;
+    enum int REGPROCOID = 24;
+    enum int TEXTOID = 25;
+    enum int OIDOID = 26;
+    enum int TIDOID = 27;
+    enum int XIDOID = 28;
+    enum int CIDOID = 29;
+    enum int OIDVECTOROID = 30;
+    enum int VARCHAROID = 1043;
+    enum int DATEOID = 1082;
+
 
     enum PGRES_EMPTY_QUERY = 0;
 
@@ -86,6 +105,39 @@ extern(System) {
     int PQfformat(const PGresult *res, int field_num);
 
     void PQclear(PGresult *res);
+
+    // date
+
+    alias long date; // long?
+    void PGTYPESdate_julmdy(date, int *);
+    void PGTYPESdate_mdyjul(int *mdy, date *jdate);
+
+    // numeric
+
+    enum int DECSIZE = 30;
+
+    alias ubyte NumericDigit;
+
+    struct numeric {
+        int			ndigits;		/* number of digits in digits[] - can be 0! */
+        int			weight;			/* weight of first digit */
+        int			rscale;			/* result scale */
+        int			dscale;			/* display scale */
+        int			sign;			/* NUMERIC_POS, NUMERIC_NEG, or NUMERIC_NAN */
+        NumericDigit *buf;			/* start of alloc'd space for digits[] */
+        NumericDigit *digits;		/* decimal digits */
+    };
+
+    struct decimal {
+        int			ndigits;		/* number of digits in digits[] - can be 0! */
+        int			weight;			/* weight of first digit */
+        int			rscale;			/* result scale */
+        int			dscale;			/* display scale */
+        int			sign;			/* NUMERIC_POS, NUMERIC_NEG, or NUMERIC_NAN */
+        NumericDigit[DECSIZE] digits;		/* decimal digits */
+    }
+
+    int PGTYPESnumeric_to_int(numeric *nv, int *ip);
 
 }
 
