@@ -3,6 +3,16 @@ import std.experimental.logger;
 import std.database.exception;
 import std.datetime;
 
+/*
+require a specific minimum version of DMD (2.071)
+can't use yet because DMD is reporting wrong version
+
+import std.compiler;
+static assert(
+        name != "Digital Mars D" ||
+        (version_major == 2 && version_minor == 70));
+*/
+
 // Place for basic DB type templates (need forward bug fixed first)
 // and other implementation related stuff
 
