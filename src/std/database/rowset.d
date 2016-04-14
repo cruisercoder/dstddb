@@ -16,7 +16,7 @@ struct RowSet {
         private RowData* data;
         this(RowSet* rs, RowData *d) {rowSet = rs; data = d;}
         int columns() {return rowSet.columns();}
-        auto opIndex(size_t idx) {return Value(Bind(ValueType.Int, &data.data[idx]));}
+        auto opIndex(size_t idx) {return Value(rowSet,Bind(ValueType.Int, &data.data[idx]));}
     }
 
     struct Bind {
@@ -32,13 +32,18 @@ struct RowSet {
 
     static auto get(X:string)(Bind *b) {return "";}
     static auto get(X:int)(Bind *b) {return *cast(int*) b;}
+    static auto get(X:Date)(Bind *b) {return Date(2016,1,1);}
 
     struct Value {
+        RowSet* rowSet;
         Bind bind;
         private void* data;
-        this(Bind b) {bind = b;}
+        this(RowSet *r, Bind b) {
+            rowSet = r;
+            bind = b;
+        }
         //auto as(T:int)() {return *cast(int*) bind.data;}
-        auto as(T:int)() {return Converter.convert!T(&bind);}
+        auto as(T:int)() {return Converter.convert!T(rowSet,&bind);}
     }
 
     struct Range {

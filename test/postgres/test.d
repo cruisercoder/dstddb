@@ -10,23 +10,6 @@ unittest {
     import std.database.testsuite;
     alias DB = Database!DefaultPolicy;
     testAll!DB("postgres");
-
-    dateTest();
-}
-
-void dateTest() {
-    import std.datetime;
-    auto db = createDatabase("postgres");
-    auto con = db.connection();
-    con.query("drop table d1");
-    con.query("create table d1(a date)");
-    con.query("insert into d1 values('2015-04-05')");
-    //con.query("drop table test1");
-    //con.query("create table test1(b int)");
-    //con.query("insert into test1 values(123)");
-    auto rs = con.query("select * from d1");
-    //assert(rs[].front()[0].as!Date == Date(2015,4,5));
-    writeln(rs[].front()[0].as!Date);
 }
 
 unittest {

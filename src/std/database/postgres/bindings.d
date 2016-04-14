@@ -106,7 +106,11 @@ extern(System) {
 
     void PQclear(PGresult *res);
 
+    char *PQresultErrorMessage(const PGresult *res);
+
     // date
+
+    /* see pgtypes_date.h */
 
     alias long date; // long?
     void PGTYPESdate_julmdy(date, int *);

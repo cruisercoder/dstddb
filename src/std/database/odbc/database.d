@@ -17,6 +17,8 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
+import std.database.impl;
+import std.datetime;
 
 //alias long SQLLEN;
 //alias ubyte SQLULEN;
@@ -28,342 +30,263 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
+alias Database(T) = BasicDatabase!(DatabaseImpl!T);
+alias Connection(T) = BasicConnection!(ConnectionImpl!T);
+alias Statement(T) = BasicStatement!(StatementImpl!T);
+alias Result(T) = BasicResult!(ResultImpl!T);
+alias ResultRange(T) = BasicResultRange!(Result!T);
+alias Row(T) = BasicRow!(ResultImpl!T);
+alias Value(T) = BasicValue!(ResultImpl!T);
+
+
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
+//if (!cachedConnection.data_.refCountedStore.isInitialized) {
+//cachedConnection = Connection!T(this, uri);
 
-struct Database(T) {
+struct DatabaseImpl(T) {
     alias Allocator = T.Allocator;
+    alias Connection = .ConnectionImpl!T;
+    alias queryVariableType = QueryVariableType.QuestionMark;
     //alias ConnectionPool = Pool!(Connection!T);
 
-    static const auto queryVariableType = QueryVariableType.QuestionMark;
-
-    // temporary
-
-    // special treatment for connections
-    auto connection(string uri="") {
-        /*
-           if (!cachedConnection.data_.refCountedStore.isInitialized) {
-           cachedConnection = Connection!T(this, uri);
-           }
-         */
-        return Connection!T(this, uri);
-    }
-
-    //ConnectionPool pool;
-
-    void query(string sql) {connection().query(sql);}
-
     bool bindable() {return false;}
+    bool dateBinding() {return false;}
 
-    this(string defaultURI) {
-        data_ = Data(defaultURI);
+    string defaultURI;
+    Allocator allocator;
+    SQLHENV env;
+
+    //Connection!T cachedConnection;  // no size error
+
+    this(string defaultURI_) {
+        info("DatabaseImpl");
+        defaultURI = defaultURI_;
+        allocator = Allocator();
+        check(
+                "SQLAllocHandle", 
+                SQLAllocHandle(
+                    SQL_HANDLE_ENV, 
+                    SQL_NULL_HANDLE,
+                    &env));
+        SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION, cast(void *) SQL_OV_ODBC3, 0);
     }
 
-
-    private:
-
-    struct Payload {
-        string defaultURI;
-        Allocator allocator;
-        SQLHENV env;
-
-        //Connection!T cachedConnection;  // no size error
-
-        this(string defaultURI_) {
-            defaultURI = defaultURI_;
-            allocator = Allocator();
-            check(
-                    "SQLAllocHandle", 
-                    SQLAllocHandle(
-                        SQL_HANDLE_ENV, 
-                        SQL_NULL_HANDLE,
-                        &env));
-            SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION, cast(void *) SQL_OV_ODBC3, 0);
-        }
-
-        ~this() {
-            info("odbc: closing database");
-            if (!env) return;
-            check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
-            env = null;
-        }
-
-        this(this) { assert(false); }
-        void opAssign(Database.Payload rhs) { assert(false); }
-
-        void showDrivers() {
-            import core.stdc.string: strlen;
-
-            SQLUSMALLINT direction;
-
-            SQLCHAR[256] driver;
-            SQLCHAR[256] attr;
-            SQLSMALLINT driver_ret;
-            SQLSMALLINT attr_ret;
-            SQLRETURN ret;
-
-            direction = SQL_FETCH_FIRST;
-            info("DRIVERS:");
-            while(SQL_SUCCEEDED(ret = SQLDrivers(
-                            env, 
-                            direction,
-                            driver.ptr, 
-                            driver.sizeof, 
-                            &driver_ret,
-                            attr.ptr, 
-                            attr.sizeof, 
-                            &attr_ret))) {
-                direction = SQL_FETCH_NEXT;
-                info(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
-                //if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
-            }
-        }
+    ~this() {
+        info("~DatabaseImpl");
+        if (!env) return;
+        check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
+        env = null;
     }
 
-    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    Data data_;
+    void showDrivers() {
+        import core.stdc.string: strlen;
 
+        SQLUSMALLINT direction;
+
+        SQLCHAR[256] driver;
+        SQLCHAR[256] attr;
+        SQLSMALLINT driver_ret;
+        SQLSMALLINT attr_ret;
+        SQLRETURN ret;
+
+        direction = SQL_FETCH_FIRST;
+        info("DRIVERS:");
+        while(SQL_SUCCEEDED(ret = SQLDrivers(
+                        env, 
+                        direction,
+                        driver.ptr, 
+                        driver.sizeof, 
+                        &driver_ret,
+                        attr.ptr, 
+                        attr.sizeof, 
+                        &attr_ret))) {
+            direction = SQL_FETCH_NEXT;
+            info(driver.ptr[0..strlen(driver.ptr)], ": ", attr.ptr[0..strlen(attr.ptr)]);
+            //if (ret == SQL_SUCCESS_WITH_INFO) printf("\tdata truncation\n");
+        }
+    }
 }
 
-struct Connection(T) {
-    //alias Database = .Database;
-    //alias Statement = .Statement;
-
-    // temporary helper functions
-    auto statement(string sql) {return Statement!T(this,sql);}
-    auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto query(string sql) {return statement(sql).query();}
-    auto query(string sql, T...) (T args) {return statement(sql).query(args);}
-
-    package this(Database!T db, string source="") {
-        data_ = Data(db,source);
-    }
-
-    private:
-
-    struct Payload {
-        Database!T db;
-        string source;
-        SQLHDBC con;
-        bool connected;
-
-        this(Database!T db_, string source_ = "") {
-            db = db_;
-            source = source_.length == 0 ? db.data_.defaultURI : source_;
-
-            info("ODBC opening connection: ", source);
-
-            char[1024] outstr;
-            SQLSMALLINT outstrlen;
-            //string DSN = "DSN=testdb";
-
-            Source src = resolve(source);
-
-            SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC,db.data_.env,&con);
-            if ((ret != SQL_SUCCESS) && (ret != SQL_SUCCESS_WITH_INFO)) {
-                throw new DatabaseException("SQLAllocHandle error: " ~ to!string(ret));
-            }
-
-            check("SQLConnect", SQL_HANDLE_DBC, con, SQLConnect(
-                        con,
-                        cast(SQLCHAR*) toStringz(src.server),
-                        SQL_NTS,
-                        cast(SQLCHAR*) toStringz(src.username),
-                        SQL_NTS,
-                        cast(SQLCHAR*) toStringz(src.password),
-                        SQL_NTS));
-            connected = true;
-        }
-
-        ~this() {
-            info("ODBC closing connection: ", source);
-            if (connected) check("SQLDisconnect", SQLDisconnect(con));
-            check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_DBC, con));
-        }
-
-        this(this) { assert(false); }
-        void opAssign(Connection.Payload rhs) { assert(false); }
-    }
-
-    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    private Data data_;
-
-}
-
-struct Statement(T) {
+struct ConnectionImpl(T) {
     alias Allocator = T.Allocator;
+    alias Database = .DatabaseImpl!T;
+    alias Statement = .StatementImpl!T;
+
+    Database* db;
+    string source;
+    SQLHDBC con;
+    bool connected;
+
+    this(Database* db_, string source_ = "") {
+        db = db_;
+        source = source_.length == 0 ? db.defaultURI : source_;
+
+        info("ConnectionImpl: ", source);
+
+        char[1024] outstr;
+        SQLSMALLINT outstrlen;
+        //string DSN = "DSN=testdb";
+
+        Source src = resolve(source);
+
+        SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC,db.env,&con);
+        if ((ret != SQL_SUCCESS) && (ret != SQL_SUCCESS_WITH_INFO)) {
+            throw new DatabaseException("SQLAllocHandle error: " ~ to!string(ret));
+        }
+
+        check("SQLConnect", SQL_HANDLE_DBC, con, SQLConnect(
+                    con,
+                    cast(SQLCHAR*) toStringz(src.server),
+                    SQL_NTS,
+                    cast(SQLCHAR*) toStringz(src.username),
+                    SQL_NTS,
+                    cast(SQLCHAR*) toStringz(src.password),
+                    SQL_NTS));
+        connected = true;
+    }
+
+    ~this() {
+        info("~ConnectionImpl: ", source);
+        if (connected) check("SQLDisconnect()", SQL_HANDLE_DBC, con, SQLDisconnect(con));
+        check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_DBC, con));
+    }
+}
+
+struct StatementImpl(T) {
+    alias Connection = .ConnectionImpl!T;
     alias Bind = .Bind!T;
-    //alias Result = .Result;
-    //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
+    alias Result = .ResultImpl!T;
+    alias Allocator = T.Allocator;
 
-    // temporary
-    auto result() {return Result!T(this);}
-    auto opSlice() {return result();} // no size error
+    Connection* con;
+    string sql;
+    Allocator *allocator;
+    SQLHSTMT stmt;
+    bool hasRows; // not working
+    int binds;
+    Array!Bind inputbind_;
 
-    this(Connection!T con, string sql) {
-        data_ = Data(con,sql);
-        prepare();
-        // must be able to detect binds in all DBs
-        //if (!data_.binds) query();
+    this(Connection* con_, string sql_) {
+        info("Statement");
+        con = con_;
+        sql = sql_;
+        allocator = &con.db.allocator;
+        check("SQLAllocHandle", SQLAllocHandle(SQL_HANDLE_STMT, con.con, &stmt));
     }
 
-    this(X...) (Connection!T con, string sql, X args) {
-        data_ = Data(con,sql);
-        prepare();
-        bindAll(args);
+    ~this() {
+        info("~Statement");
+        for(int i = 0; i < inputbind_.length; ++i) {
+            allocator.deallocate(inputbind_[i].data[0..inputbind_[i].allocSize]);
+        }
+        if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
+        // stmt = null? needed
     }
 
-    string sql() {return data_.sql;}
-    int binds() {return data_.binds;}
+    void bind(int n, int value) {
+        info("input bind: n: ", n, ", value: ", value);
 
-    void bind(int n, int value) {data_.bind(n, value);}
-    void bind(int n, const char[] value) {data_.bind(n, value);}
+        Bind b;
+        b.bindType = SQL_C_LONG;
+        b.dbtype = SQL_INTEGER;
+        b.size = SQLINTEGER.sizeof;
+        b.allocSize = b.size;
+        b.data = cast(void*)(allocator.allocate(b.allocSize));
+        inputBind(n, b);
 
-    private:
-
-    struct Payload {
-        Connection!T con;
-        string sql;
-        Allocator *allocator;
-        SQLHSTMT stmt;
-        bool hasRows;
-        int binds;
-        Array!Bind inputbind_;
-
-        this(Connection!T con_, string sql_) {
-            con = con_;
-            sql = sql_;
-            allocator = &con.data_.db.data_.allocator;
-            check("SQLAllocHandle", SQLAllocHandle(SQL_HANDLE_STMT, con.data_.con, &stmt));
-        }
-
-        ~this() {
-            for(int i = 0; i < inputbind_.length; ++i) {
-                allocator.deallocate(inputbind_[i].data[0..inputbind_[i].allocSize]);
-            }
-            if (stmt) check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_STMT, stmt));
-            // stmt = null? needed
-        }
-
-        this(this) { assert(false); }
-        void opAssign(Statement.Payload rhs) { assert(false); }
-
-
-        void bind(int n, int value) {
-            info("input bind: n: ", n, ", value: ", value);
-
-            Bind b;
-            b.type = SQL_C_LONG;
-            b.dbtype = SQL_INTEGER;
-            b.size = SQLINTEGER.sizeof;
-            b.allocSize = b.size;
-            b.data = cast(void*)(allocator.allocate(b.allocSize));
-            inputBind(n, b);
-
-            *(cast(SQLINTEGER*) inputbind_[n-1].data) = value;
-        }
-
-        void bind(int n, const char[] value){
-            import core.stdc.string: strncpy;
-            info("input bind: n: ", n, ", value: ", value);
-            // no null termination needed
-
-            Bind b;
-            b.type = SQL_C_CHAR;
-            b.dbtype = SQL_CHAR;
-            b.size = cast(SQLSMALLINT) value.length;
-            b.allocSize = b.size;
-            b.data = cast(void*)(allocator.allocate(b.allocSize));
-            inputBind(n, b);
-
-            strncpy(cast(char*) b.data, value.ptr, b.size);
-        }
-
-        void inputBind(int n, ref Bind bind) {
-            inputbind_ ~= bind;
-            auto b = &inputbind_.back();
-
-            check("SQLBindParameter", SQLBindParameter(
-                        stmt,
-                        cast(SQLSMALLINT) n,
-                        SQL_PARAM_INPUT,
-                        b.type,
-                        b.dbtype,
-                        0,
-                        0,
-                        b.data,
-                        b.allocSize,
-                        null));
-        }
-
-
-        void prepare() {
-            //if (!data_.st)
-            check("SQLPrepare", SQLPrepare(
-                        stmt,
-                        cast(SQLCHAR*) toStringz(sql),
-                        SQL_NTS));
-
-            SQLSMALLINT v;
-            check("SQLNumParams", SQLNumParams(stmt, &v));
-            binds = v;
-            check("SQLNumResultCols", SQLNumResultCols (stmt, &v));
-            info("binds: ", binds);
-        }
-
-        void query() {
-            if (!binds) {
-                info("sql execute direct: ", sql);
-                check("SQLExecDirect", SQLExecDirect(
-                            stmt,
-                            cast(SQLCHAR*) toStringz(sql),
-                            SQL_NTS));
-            } else {
-                info("sql execute prepared: ", sql);
-                SQLRETURN ret = SQLExecute(stmt);
-                check("SQLExecute()", SQL_HANDLE_STMT, stmt, ret);
-            }
-        }
-
-        void exec() {
-            check("SQLExecDirect", SQLExecDirect(stmt,cast(SQLCHAR*) toStringz(sql), SQL_NTS));
-        }
-
-
+        *(cast(SQLINTEGER*) inputbind_[n-1].data) = value;
     }
 
-    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    Data data_;
+    void bind(int n, const char[] value){
+        import core.stdc.string: strncpy;
+        info("input bind: n: ", n, ", value: ", value);
+        // no null termination needed
 
-    void prepare() {data_.prepare();}
+        Bind b;
+        b.bindType = SQL_C_CHAR;
+        b.dbtype = SQL_CHAR;
+        b.size = cast(SQLSMALLINT) value.length;
+        b.allocSize = b.size;
+        b.data = cast(void*)(allocator.allocate(b.allocSize));
+        inputBind(n, b);
+
+        strncpy(cast(char*) b.data, value.ptr, b.size);
+    }
+
+    void bind(int n, Date d) {
+    }
+
+    void inputBind(int n, ref Bind bind) {
+        inputbind_ ~= bind;
+        auto b = &inputbind_.back();
+
+        check("SQLBindParameter", SQLBindParameter(
+                    stmt,
+                    cast(SQLSMALLINT) n,
+                    SQL_PARAM_INPUT,
+                    b.bindType,
+                    b.dbtype,
+                    0,
+                    0,
+                    b.data,
+                    b.allocSize,
+                    null));
+    }
+
+
+    void prepare() {
+        //if (!data_.st)
+        check("SQLPrepare", SQLPrepare(
+                    stmt,
+                    cast(SQLCHAR*) toStringz(sql),
+                    SQL_NTS));
+
+        SQLSMALLINT v;
+        check("SQLNumParams", SQLNumParams(stmt, &v));
+        binds = v;
+        check("SQLNumResultCols", SQLNumResultCols (stmt, &v));
+        info("binds: ", binds);
+    }
 
     void query() {
-        data_.query();
+        if (!binds) {
+            info("sql execute direct: ", sql);
+            SQLRETURN ret = SQLExecDirect(
+                    stmt,
+                    cast(SQLCHAR*) toStringz(sql),
+                    SQL_NTS);
+            check("SQLExecuteDirect()", SQL_HANDLE_STMT, stmt, ret);
+            hasRows = ret != SQL_NO_DATA;
+        } else {
+            info("sql execute prepared: ", sql);
+            SQLRETURN ret = SQLExecute(stmt);
+            check("SQLExecute()", SQL_HANDLE_STMT, stmt, ret);
+            hasRows = ret != SQL_NO_DATA;
+        }
     }
 
     void query(X...) (X args) {
-        int col;
-        foreach (arg; args) {
-            bind(++col, arg);
-        }
+        bindAll(args);
         query();
     }
 
-    private:
-
-    void bindAll(T...) (T args) {
-        int col;
-        foreach (arg; args) {
-            bind(++col, arg);
-        }
+    void exec() {
+        check("SQLExecDirect", SQLExecDirect(stmt,cast(SQLCHAR*) toStringz(sql), SQL_NTS));
     }
 
     void reset() {
         //SQLCloseCursor
     }
 
+    private void bindAll(T...) (T args) {
+        int col;
+        foreach (arg; args) {
+            bind(++col, arg);
+        }
+    }
 }
 
 
@@ -381,7 +304,9 @@ struct Describe(T) {
 }
 
 struct Bind(T) {
-    SQLSMALLINT type;
+    ValueType type;
+
+    SQLSMALLINT bindType;
     SQLSMALLINT dbtype;
     //SQLCHAR* data[maxData];
     void* data;
@@ -396,231 +321,161 @@ struct Bind(T) {
     SQLINTEGER len;
 }
 
-struct Result(T) {
+struct ResultImpl(T) {
     alias Allocator = T.Allocator;
+    alias Statement = .StatementImpl!T;
     alias Describe = .Describe!T;
     alias Bind = .Bind!T;
-    alias Range = .ResultRange!T;
-    alias Row = .Row!T;
 
-    int columns() {return data_.columns;}
-
-    this(Statement!T stmt) {
-        data_ = Data(stmt);
-    }
-
-    auto opSlice() {return ResultRange!T(this);}
-
-    bool start() {return data_.status == SQL_SUCCESS;}
-    bool next() {return data_.next();}
-
-    private:
+    //int columns() {return columns;}
 
     static const maxData = 256;
 
-    struct Payload {
-        Statement!T stmt;
-        Allocator *allocator;
-        int columns;
-        Array!Describe describe;
-        Array!Bind bind;
-        SQLRETURN status;
+    Statement* stmt;
+    Allocator *allocator;
+    int columns;
+    Array!Describe describe;
+    Array!Bind bind;
+    SQLRETURN status;
 
-        this(Statement!T stmt_) {
-            stmt = stmt_;
-            allocator = stmt.data_.allocator;
-            build_describe();
-            build_bind();
-            next();
+    this(Statement* stmt_) {
+        stmt = stmt_;
+        allocator = stmt.allocator;
+
+        // check for result set (probably a better way)
+        //if (!stmt.hasRows) return;
+        SQLSMALLINT v;
+        check("SQLNumResultCols", SQLNumResultCols (stmt.stmt, &v));
+        columns = v;
+
+        if (!columns) return;
+
+        build_describe();
+        build_bind();
+        next();
+    }
+
+    ~this() {
+        for(int i = 0; i < bind.length; ++i) {
+            free(bind[i].data);
         }
+    }
 
-        ~this() {
-            for(int i = 0; i < bind.length; ++i) {
-                free(bind[i].data);
-            }
+    void build_describe() {
+
+        describe.reserve(columns);
+
+        for(int i = 0; i < columns; ++i) {
+            describe ~= Describe();
+            auto d = &describe.back();
+
+            check("SQLDescribeCol", SQLDescribeCol(
+                        stmt.stmt,
+                        cast(SQLUSMALLINT) (i+1),
+                        cast(SQLCHAR *) d.name,
+                        cast(SQLSMALLINT) Describe.nameSize,
+                        &d.nameLen,
+                        &d.type,
+                        &d.size,
+                        &d.digits,
+                        &d.nullable));
+
+            //info("NAME: ", d.name, ", type: ", d.type);
         }
+    }
 
-        void build_describe() {
+    void build_bind() {
+        import core.memory : GC;
 
-            SQLSMALLINT v;
-            check("SQLNumResultCols", SQLNumResultCols (stmt.data_.stmt, &v));
-            columns = v;
-            info("columns: ", columns);
+        bind.reserve(columns);
 
-            describe.reserve(columns);
+        for(int i = 0; i < columns; ++i) {
+            bind ~= Bind();
+            auto b = &bind.back();
+            auto d = &describe[i];
 
-            for(int i = 0; i < columns; ++i) {
-                describe ~= Describe();
-                auto d = &describe.back();
+            b.size = d.size;
+            b.allocSize = cast(SQLULEN) (b.size + 1);
+            b.data = cast(void*)(allocator.allocate(b.allocSize));
+            GC.addRange(b.data, b.allocSize);
 
-                check("SQLDescribeCol", SQLDescribeCol(
-                            stmt.data_.stmt,
-                            cast(SQLUSMALLINT) (i+1),
-                            cast(SQLCHAR *) d.name,
-                            cast(SQLSMALLINT) Describe.nameSize,
-                            &d.nameLen,
-                            &d.type,
-                            &d.size,
-                            &d.digits,
-                            &d.nullable));
-
-                //info("NAME: ", d.name, ", type: ", d.type);
+            // just INT and VARCHAR for now
+            switch (d.type) {
+                case SQL_INTEGER:
+                    //b.type = SQL_C_LONG;
+                    b.type = ValueType.String;
+                    b.bindType = SQL_C_CHAR;
+                    break;
+                case SQL_VARCHAR:
+                    b.type = ValueType.String;
+                    b.bindType = SQL_C_CHAR;
+                    break;
+                default: 
+                    throw new DatabaseException("bind error: type: " ~ to!string(d.type));
             }
+
+            check("SQLBINDCol", SQLBindCol (
+                        stmt.stmt,
+                        cast(SQLUSMALLINT) (i+1),
+                        b.bindType,
+                        b.data,
+                        b.size,
+                        &b.len));
+
+            info(
+                    "output bind: index: ", i,
+                    ", type: ", b.bindType,
+                    ", size: ", b.size,
+                    ", allocSize: ", b.allocSize);
         }
+    }
 
-        void build_bind() {
-            import core.memory : GC;
+    bool start() {return status == SQL_SUCCESS;}
 
-            bind.reserve(columns);
-
-            for(int i = 0; i < columns; ++i) {
-                bind ~= Bind();
-                auto b = &bind.back();
-                auto d = &describe[i];
-
-                b.size = d.size;
-                b.allocSize = cast(SQLULEN) (b.size + 1);
-                b.data = cast(void*)(allocator.allocate(b.allocSize));
-                GC.addRange(b.data, b.allocSize);
-
-                // just INT and VARCHAR for now
-                switch (d.type) {
-                    case SQL_INTEGER:
-                        //b.type = SQL_C_LONG;
-                        b.type = SQL_C_CHAR;
-                        break;
-                    case SQL_VARCHAR:
-                        b.type = SQL_C_CHAR;
-                        break;
-                    default: 
-                        throw new DatabaseException("bind error: type: " ~ to!string(d.type));
-                }
-
-                check("SQLBINDCol", SQLBindCol (
-                            stmt.data_.stmt,
-                            cast(SQLUSMALLINT) (i+1),
-                            b.type,
-                            b.data,
-                            b.size,
-                            &b.len));
-
-                info(
-                        "output bind: index: ", i,
-                        ", type: ", b.type,
-                        ", size: ", b.size,
-                        ", allocSize: ", b.allocSize);
-            }
-        }
-
-        bool next() {
-            //info("SQLFetch");
-            status = SQLFetch(stmt.data_.stmt);
-            if (status == SQL_SUCCESS) {
-                return true; 
-            } else if (status == SQL_NO_DATA) {
-                stmt.reset();
-                return false;
-            }
-            check("SQLFetch", SQL_HANDLE_STMT, stmt.data_.stmt, status);
+    bool next() {
+        //info("SQLFetch");
+        status = SQLFetch(stmt.stmt);
+        if (status == SQL_SUCCESS) {
+            return true; 
+        } else if (status == SQL_NO_DATA) {
+            stmt.reset();
             return false;
         }
-
-        this(this) { assert(false); }
-        void opAssign(Statement!T.Payload rhs) { assert(false); }
+        check("SQLFetch", SQL_HANDLE_STMT, stmt.stmt, status);
+        return false;
     }
 
-    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    Data data_;
-
-}
-
-struct Value(T) {
-    alias Bind = .Bind!T;
-    package Bind* bind_;
-
-    this(Bind* bind) {
-        bind_ = bind;
+    auto get(X:string)(Bind *b) {
+        checkType(b.bindType, SQL_C_CHAR);
+        auto ptr = cast(immutable char*) b.data;
+        return cast(string) ptr[0..b.len];
     }
 
-    auto as(T:int)() {
-        if (bind_.type == SQL_C_CHAR) return to!int(as!string()); // tmp hack
-        check(bind_.type, SQL_C_LONG);
-        return *(cast(int*) bind_.data);
+    auto get(X:int)(Bind *b) {
+        //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
+        checkType(b.bindType, SQL_C_LONG);
+        return *(cast(int*) b.data);
     }
 
-    auto as(T:string)() {
-        check(bind_.type, SQL_C_CHAR);
-        auto ptr = cast(immutable char*) bind_.data;
-        return cast(string) ptr[0..bind_.len];
+    auto get(X:Date)(Bind *b) {
+        return Date(2016,1,1); // fix
     }
 
-    //inout(char)[]
-    auto chars() {
-        check(bind_.type, SQL_C_CHAR);
-        auto data = cast(char*) bind_.data;
-        return data ? data[0..bind_.len] : data[0..0];
-    }
-
-    private:
-
-    void check(SQLSMALLINT a, SQLSMALLINT b) {
+    void checkType(SQLSMALLINT a, SQLSMALLINT b) {
         if (a != b) throw new DatabaseException("type mismatch");
     }
 
 }
 
-struct Row(T) {
-    alias Result = .Result!T;
-    alias Value = .Value!T;
-
-    this(Result* result) {
-        result_ = result;
-    }
-
-    int columns() {return result_.columns();}
-
-    Value opIndex(size_t idx) {
-        return Value(&result_.data_.bind[idx]);
-    }
-
-    private Result* result_;
-}
-
-struct ResultRange(T) {
-    // implements a One Pass Range
-    alias Result = .Result!T;
-    alias Row = .Row!T;
-
-    private Result result_;
-    private bool ok_;
-
-    this(Result result) {
-        result_ = result;
-        ok_ = result_.start();
-    }
-
-    bool empty() {
-        return !ok_;
-    }
-
-    Row front() {
-        return Row(&result_);
-    }
-
-    void popFront() {
-        ok_ = result_.next();
-    }
-}
-
 void check()(string msg, SQLRETURN ret) {
     info(msg, ":", ret);
-    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) return;
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO || ret == SQL_NO_DATA) return;
     throw new DatabaseException("odbc error: " ~ msg);
 }
 
 void check()(string msg, SQLSMALLINT handle_type, SQLHANDLE handle, SQLRETURN ret) {
     info(msg, ":", ret);
-    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO) return;
+    if (ret == SQL_SUCCESS || ret == SQL_SUCCESS_WITH_INFO || ret == SQL_NO_DATA) return;
     throw_detail(handle, handle_type, msg);
 }
 
@@ -650,7 +505,7 @@ void throw_detail()(SQLHANDLE handle, SQLSMALLINT type, string msg) {
         if (SQL_SUCCEEDED(ret)) {
             auto s = text[0..len];
             info("error: ", s);
-            //error =~ s;
+            error ~= s;
             //writefln("%s:%ld:%ld:%s\n", state, i, native, text);
         }
     } while (ret == SQL_SUCCESS);

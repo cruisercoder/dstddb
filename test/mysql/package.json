@@ -8,7 +8,6 @@
     ],
     "sourcePaths": [".", "../../src"],
     "libs" : ["mysqlclient"],
-    "versions": ["StdLoggerDisableInfo"],
     "dependencies": {
     },
     "configurations": [

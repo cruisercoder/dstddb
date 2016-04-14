@@ -3,6 +3,9 @@ import std.conv;
 import core.stdc.config;
 import std.datetime;
 
+import std.stdio;
+import std.database.common;
+
 version(Windows) {
     pragma(lib, "libmysql");
 }
@@ -11,234 +14,41 @@ else {
 }
 
 import std.database.mysql.bindings;
-import std.database.common;
 import std.database.exception;
 import std.database.resolver;
 import std.database.allocator;
 import std.database.impl;
-import std.database.pool;
 import std.container.array;
 import std.experimental.logger;
 import std.string;
-import std.typecons;
 
 // -----------------------------------------------
 // template section for front end
 // can't move into common file (impl.d) until forward bug is fixed
-
-struct BasicDatabase(T,Impl) {
-    alias Allocator = T.Allocator;
-    //alias Pool = .Pool!(BasicDatabase,Connection!T); // no size error
-
-    static const auto queryVariableType = QueryVariableType.QuestionMark;
-
-    // temporary
-    auto connection() {return Connection!T(this);}
-    auto connection(string uri) {return Connection!T(this, uri);}
-    void query(string sql) {connection().query(sql);}
-
-    bool bindable() {return true;}
-
-    private struct Payload {
-        string defaultURI;
-        Allocator allocator;
-
-        this(string defaultURI_) {
-            defaultURI = defaultURI_;
-            allocator = Allocator();
-        }
-    }
-
-    this(string defaultURI) {
-        data_ = Data(defaultURI);
-    }
-
-    private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
-    private Data data_;
-}
-
-
-struct BasicConnection(T,Impl) {
-    alias Allocator = T.Allocator;
-    //alias Database = .Database;
-    //alias Statement = .Statement;
-
-    auto statement(string sql) {return Statement!T(this,sql);}
-    auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto query(string sql) {return statement(sql).query();}
-    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
-
-    private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
-    private Data data_;
-
-    package this(Database!T db, string uri="") {
-        data_ = Data(db,uri);
-    }
-
-    package this(Database!T db, ref Allocator allocator, string uri="") {
-        data_ = Data(db,uri);
-    }
-
-
-}
-
-struct BasicStatement(T,Impl) {
-    alias Allocator = T.Allocator;
-    //alias Result = .Result;
-
-    auto result() {return Result!T(this);}
-    auto opSlice() {return result();} //fix
-
-    this(Connection!T con, string sql) {
-        data_ = Data(con,sql);
-        prepare();
-    }
-
-    this(X...) (Connection!T con, string sql, X args) {
-        data_ = Data(con,sql);
-        prepare();
-        bindAll(args);
-    }
-
-    string sql() {return data_.sql;}
-    int binds() {return data_.binds;}
-
-    void bind(int n, int value) {data_.bind(n, value);}
-    void bind(int n, const char[] value){data_.bind(n,value);}
-
-    auto query() {
-        data_.query();
-        return result();
-    }
-
-    auto query(X...) (X args) {
-        bindAll(args);
-        return query();
-    }
-
-    private:
-
-    alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
-    Data data_;
-
-    void bindAll(T...) (T args) {
-        int col;
-        foreach (arg; args) bind(++col, arg);
-    }
-
-    void prepare() {
-        data_.prepare();
-    }
-
-    void reset() {} //SQLCloseCursor
-}
-
-
-struct BasicResult(T,Impl) {
-    alias Allocator = T.Allocator;
-    //alias Range = .ResultRange!T;
-    //alias Row = .Row;
-
-    int columns() {return data_.columns;}
-
-    this(Statement!T stmt) {
-        data_ = Data(stmt);
-    }
-
-    auto opSlice() {return ResultRange!T(this);}
-
-package:
-    bool start() {return data_.status == 0;}
-    bool next() {return data_.next();}
-
-    private:
-
-    alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
-    Data data_;
-
-}
-
-struct BasicResultRange(T) {
-    alias Result = .Result!T;
-    alias Row = .Row!T;
-
-    private Result result_;
-    private bool ok_;
-
-    this(Result result) {
-        result_ = result;
-        ok_ = result_.start();
-    }
-
-    bool empty() {return !ok_;}
-    Row front() {return Row(&result_);}
-    void popFront() {ok_ = result_.next();}
-}
-
-struct BasicRow(T) {
-    alias Result = .Result!T;
-    alias Value = .Value!T;
-
-    this(Result* result) {
-        result_ = result;
-    }
-
-    int columns() {return result_.columns();}
-    Value opIndex(size_t idx) {return Value(&result_.data_.bind[idx]);}
-
-    private Result* result_;
-}
-
-struct BasicValue(T,Impl) {
-    alias Bind = .Bind!T;
-    private Bind* bind_;
-    alias Converter = .Converter!Impl;
-
-    this(Bind* bind) {bind_ = bind;}
-
-    auto as(T:int)() {return Converter.convert!T(bind_);}
-    auto as(T:string)() {return Converter.convert!T(bind_);}
-    auto as(T:Date)() {return Converter.convert!T(bind_);}
-
-    /*
-    //inout(char)[]
-    char[] chars() {
-    Impl.checkType!string(bind_);
-    return Impl.get!(char[])(bind_); 
-    }
-     */
-
-    auto chars() {return as!string();}
-}
-
-struct EfficientValue(T,Impl) {
-    alias Bind = .Bind!T;
-    private Bind* bind_;
-    alias Converter = .Converter!Impl;
-
-    this(Bind* bind) {bind_ = bind;}
-
-    auto as(T:int)() {return Converter.convertDirect!T(bind_);}
-    auto as(T:string)() {return Converter.convertDirect!T(bind_);}
-    auto as(T:Date)() {return Converter.convertDirect!T(bind_);}
-}
 
 // -----------------------------------------------
 // target database specfic code
 
 // alias Database(T) = std.database.impl.Database!(T,DatabaseImpl!T); // blocked by DMD bug
 
-alias Database(T) = BasicDatabase!(T,DatabaseImpl!T);
-alias Connection(T) = BasicConnection!(T,ConnectionImpl!T);
-alias Statement(T) = BasicStatement!(T,StatementImpl!T);
-alias Result(T) = BasicResult!(T,ResultImpl!T);
-alias ResultRange(T) = BasicResultRange!(T);
-alias Row(T) = BasicRow!(T);
-alias Value(T) = BasicValue!(T,ResultImpl!T);
-//alias Value(T) = EfficientValue!(T,ResultImpl!T);
+alias Database(T) = BasicDatabase!(DatabaseImpl!T);
+alias Connection(T) = BasicConnection!(ConnectionImpl!T);
+alias Statement(T) = BasicStatement!(StatementImpl!T);
+alias Result(T) = BasicResult!(ResultImpl!T);
+alias ResultRange(T) = BasicResultRange!(Result!T);
+alias Row(T) = BasicRow!(ResultImpl!T);
+alias Value(T) = BasicValue!(ResultImpl!T);
+//alias Value(T) = EfficientValue!(ResultImpl!T);
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
+}
+
+struct Impl {
+    alias Database(T) = .DatabaseImpl!T;
+    alias Connection(T) = .ConnectionImpl!T;
+    alias Statement(T) = .StatementImpl!T;
+    alias Result(T) = .ResultImpl!T;
 }
 
 auto createDatabase()(string defaultURI="") {
@@ -251,6 +61,9 @@ auto createDatabase(T)(string defaultURI="") {
 
 struct DatabaseImpl(T) {
     alias Allocator = T.Allocator;
+    alias Connection = .ConnectionImpl!T;
+    alias queryVariableType = QueryVariableType.QuestionMark;
+
     string defaultURI;
     Allocator allocator;
 
@@ -258,17 +71,25 @@ struct DatabaseImpl(T) {
         defaultURI = defaultURI_;
         allocator = Allocator();
     }
+
+    bool bindable() {return true;}
+    bool dateBinding() {return true;}
+
+    //~this() {log("~Database");}
 }
 
-
 struct ConnectionImpl(T) {
-    Database!T db;
+    alias Allocator = T.Allocator;
+    alias Database = .DatabaseImpl!T;
+    alias Statement = .StatementImpl!T;
+
+    DatabaseImpl!T *db;
     string uri;
     MYSQL *mysql;
 
-    this(Database!T db_, string uri_) {
+    this(DatabaseImpl!T *db_, string uri_) {
         db = db_;
-        uri = uri_.length == 0 ? db_.data_.defaultURI : uri_;
+        uri = uri_.length == 0 ? db_.defaultURI : uri_;
 
         mysql = mysql_init(null);
         if (!mysql) {
@@ -279,7 +100,7 @@ struct ConnectionImpl(T) {
     }
 
     ~this() {
-        info("mysql closing ", uri);
+        //log("~Statement");
         if (mysql) {
             mysql_close(mysql);
             mysql = null;
@@ -345,10 +166,12 @@ void bindSetup(T)(ref Array!(Bind!T) bind, ref Array!MYSQL_BIND mysqlBind) {
 
 
 struct StatementImpl(T) {
-    alias Allocator = T.Allocator;
+    alias Connection = .ConnectionImpl!T;
     alias Bind = .Bind!T;
+    alias Result = .ResultImpl!T;
+    alias Allocator = T.Allocator;
 
-    Connection!T con;
+    ConnectionImpl!T *con;
     string sql;
     Allocator *allocator;
     MYSQL_STMT *stmt;
@@ -358,12 +181,12 @@ struct StatementImpl(T) {
     Array!MYSQL_BIND mysqlBind;
     bool bindInit;
 
-    this(Connection!T con_, string sql_) {
+    this(ConnectionImpl!T *con_, string sql_) {
         con = con_;
         sql = sql_;
-        allocator = &con.data_.db.data_.allocator;
+        allocator = &con.db.allocator;
 
-        stmt = mysql_stmt_init(con.data_.mysql);
+        stmt = mysql_stmt_init(con.mysql);
         if (!stmt) throw new DatabaseException("stmt error");
     }
 
@@ -388,7 +211,6 @@ struct StatementImpl(T) {
     }
 
     void query() {
-
         if (inputBind.length && !bindInit) {
             bindInit = true;
 
@@ -401,6 +223,19 @@ struct StatementImpl(T) {
 
         info("execute: ", sql);
         check("mysql_stmt_execute", stmt, mysql_stmt_execute(stmt));
+    }
+
+    void query(X...) (X args) {
+        bindAll(args);
+        query();
+    }
+
+    void reset() {
+    }
+
+    private void bindAll(T...) (T args) {
+        int col;
+        foreach (arg; args) bind(++col, arg);
     }
 
     void bind(int n, int value) {
@@ -424,6 +259,17 @@ struct StatementImpl(T) {
         strncpy(p, value.ptr, value.length);
         p[value.length] = 0;
         b.length = value.length;
+    }
+
+    void bind(int n, Date d) {
+        auto b = bindAlloc(n, MYSQL_TYPE_DATE, MYSQL_TIME.sizeof);
+        b.is_null = 0;
+        b.error = 0;
+
+        auto p = cast(MYSQL_TIME*) b.data.ptr;
+        p.year = d.year;
+        p.month = d.month;
+        p.day = d.day;
     }
 
     Bind* bindAlloc(int n, int mysql_type, int allocSize) {
@@ -455,13 +301,15 @@ struct StatementImpl(T) {
 }
 
 struct ResultImpl(T) {
+    alias Statement = .StatementImpl!T;
+    alias Bind = .Bind!T;
+
     this(this) { assert(false); }
     void opAssign(ResultImpl rhs) { assert(false); }
 
     alias Allocator = T.Allocator;
     alias Describe = .Describe!T;
-    alias Bind = .Bind!T;
-    Statement!T stmt;
+    Statement *stmt;
     Allocator *allocator;
     uint columns;
     Array!Describe describe;
@@ -472,11 +320,11 @@ struct ResultImpl(T) {
 
     static const maxData = 256;
 
-    this(Statement!T stmt_) {
+    this(Statement* stmt_) {
         stmt = stmt_;
-        allocator = stmt.data_.allocator;
+        allocator = stmt.allocator;
 
-        result_metadata = mysql_stmt_result_metadata(stmt.data_.stmt);
+        result_metadata = mysql_stmt_result_metadata(stmt.stmt);
         if (!result_metadata) return;
         //columns = mysql_num_fields(result_metadata);
 
@@ -486,6 +334,7 @@ struct ResultImpl(T) {
     }
 
     ~this() {
+        //log("~Result");
         foreach(b; bind) allocator.deallocate(b.data);
         if (result_metadata) mysql_free_result(result_metadata);
     }
@@ -493,7 +342,7 @@ struct ResultImpl(T) {
     void build_describe() {
         import core.stdc.string: strlen;
 
-        columns = cast(uint) mysql_stmt_field_count(stmt.data_.stmt);
+        columns = cast(uint) mysql_stmt_field_count(stmt.stmt);
 
         describe.reserve(columns);
 
@@ -540,11 +389,13 @@ struct ResultImpl(T) {
 
         bindSetup(bind, mysqlBind);
 
-        mysql_stmt_bind_result(stmt.data_.stmt, &mysqlBind.front());
+        mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
     }
 
+    bool start() {return status == 0;}
+
     bool next() {
-        status = mysql_stmt_fetch(stmt.data_.stmt);
+        status = mysql_stmt_fetch(stmt.stmt);
         if (!status) {
             return true;
         } else if (status == MYSQL_NO_DATA) {
@@ -554,26 +405,26 @@ struct ResultImpl(T) {
             throw new DatabaseException("fetch: database truncation");
         }
 
-        StatementImpl!T.createError("mysql_stmt_fetch",stmt.data_.stmt,status);
+        StatementImpl!T.createError("mysql_stmt_fetch",stmt.stmt,status);
         return false;
     }
 
     // value getters
 
-    static char[] get(X:char[])(Bind *b) {
+    char[] get(X:char[])(Bind *b) {
         auto ptr = cast(char*) b.data.ptr;
         return ptr[0..b.length];
     }
 
-    static auto get(X:string)(Bind *b) {
+    auto get(X:string)(Bind *b) {
         return cast(string) get!(char[])(b);
     }
 
-    static auto get(X:int)(Bind *b) {
+    auto get(X:int)(Bind *b) {
         return *cast(int*) b.data.ptr;
     }
 
-    static auto get(X:Date)(Bind *b) {
+    auto get(X:Date)(Bind *b) {
         //return Date(2016,1,1); // fix
         MYSQL_TIME *t = cast(MYSQL_TIME*) b.data.ptr;
         //t.year,t.month,t.day,t.hour,t.minute,t.second

@@ -12,6 +12,7 @@ import std.database.resolver;
 import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
+import std.database.impl;
 
 import std.stdio;
 import std.typecons;
@@ -21,6 +22,14 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
+alias Database(T) = BasicDatabase!(DatabaseImpl!T);
+alias Connection(T) = BasicConnection!(ConnectionImpl!T);
+alias Statement(T) = BasicStatement!(StatementImpl!T);
+alias Result(T) = BasicResult!(ResultImpl!T);
+alias ResultRange(T) = BasicResultRange!(Result!T);
+alias Row(T) = BasicRow!(ResultImpl!T);
+alias Value(T) = BasicValue!(ResultImpl!T);
+
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
@@ -29,119 +38,92 @@ auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
-struct Database(T=DefaultPolicy) {
+struct DatabaseImpl(T) {
     alias Allocator = T.Allocator;
-    //alias Connection = .Connection!T;
-
+    alias Connection = .ConnectionImpl!T;
     static const auto queryVariableType = QueryVariableType.Dollar;
 
-    this(string defaultURI) {
-        data_ = Data(defaultURI);
+    Allocator allocator;
+    string defaultURI;
+
+    this(string defaultURI_) {
+        allocator = Allocator();
+        defaultURI = defaultURI_;
     }
 
-    // temporary
-    auto connection() {return Connection!T(this);}
-    auto connection(string uri) {return Connection!T(this, uri);}
-    void query(string sql) {connection().query(sql);}
+    ~this() {
+    }
 
     bool bindable() {return true;}
-
-    private struct Payload {
-        Allocator allocator;
-        string defaultURI;
-
-        this(string defaultURI_) {
-            allocator = Allocator();
-            defaultURI = defaultURI_;
-        }
-
-        ~this() {
-        }
-
-        this(this) { assert(false); }
-        void opAssign(Database.Payload rhs) { assert(false); }
-    }
-
-    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    private Data data_;
-
+    bool dateBinding() {return true;}
 }
 
-struct Connection(T) {
-    //alias Database = .Database!T;
-    //alias Statement = .Statement!T;
-
-    // temporary
-    auto statement (string sql) { return Statement!T(this, sql); }
-    auto statement(X...) (string sql, X args) {return Statement!T(this, sql, args);}
-    auto query(string sql) {return statement(sql).query();}
-    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
-
-    package this(Database!T db, string source="") {
-        data_ = Data(db,source);
-    }
-
-    private:
-
-    struct Payload {
-        Database!T db;
-        string source;
-        PGconn *con;
-
-        this(Database!T db_, string source_) {
-            db = db_;
-            source = source_.length == 0 ? db.data_.defaultURI : source_;
-
-            Source src = resolve(source);
-            string conninfo;
-            conninfo ~= "dbname=" ~ src.database;
-            con = PQconnectdb(toStringz(conninfo));
-            if (PQstatus(con) != CONNECTION_OK) error("login error");
-        }
-
-        void error(string msg) {
-            import std.conv;
-            auto s = msg ~ to!string(PQerrorMessage(con));
-            throw new DatabaseException(msg);
-        }
-
-        ~this() {
-            PQfinish(con);
-        }
-
-        this(this) { assert(false); }
-        void opAssign(Connection.Payload rhs) { assert(false); }
-    }
-
-    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    private Data data_;
-}
-
-
-struct Statement(T) {
+struct ConnectionImpl(T) {
+    alias Database = .DatabaseImpl!T;
+    alias Statement = .StatementImpl!T;
     alias Allocator = T.Allocator;
-    //alias Connection = .Connection!T;
-    //alias Result = .Result;
-    //alias Range = Result.Range;
 
-    //ResultRange!T range() {return Result!T(this).range();} // no size error
+    Database* db;
+    string source;
+    PGconn *con;
 
-    // temporary
-    auto result() {return Result!T(this);}
-    auto opSlice() {return Result!T(this);} // no size error
+    this(Database* db_, string source_) {
+        db = db_;
+        source = source_.length == 0 ? db.defaultURI : source_;
 
-    this(Connection!T con, string sql) {
-        data_ = Data(con,sql);
-        prepare();
+        Source src = resolve(source);
+        string conninfo;
+        conninfo ~= "dbname=" ~ src.database;
+        con = PQconnectdb(toStringz(conninfo));
+        if (PQstatus(con) != CONNECTION_OK) error("login error");
     }
 
-    this(X...) (Connection!T con, string sql, X args) {
-        data_ = Data(con,sql);
-        prepare();
-        bindAll(args);
+    void error(string msg) {
+        import std.conv;
+        auto s = msg ~ to!string(PQerrorMessage(con));
+        throw new DatabaseException(msg);
     }
 
-    string sql() {return data_.sql;}
+    ~this() {
+        PQfinish(con);
+    }
+}
+
+
+struct StatementImpl(T) {
+    alias Allocator = T.Allocator;
+    alias Connection = .ConnectionImpl!T;
+    alias Bind = .Bind!T;
+    alias Result = .ResultImpl!T;
+
+    Connection* connection;
+    string sql;
+    Allocator *allocator;
+    PGconn *con;
+    string name;
+    PGresult *prepareRes;
+    PGresult *res;
+
+    Array!(char*) bindValue;
+    Array!(Oid) bindType;
+    Array!(int) bindLength;
+    Array!(int) bindFormat;
+
+    this(Connection* connection_, string sql_) {
+        connection = connection_;
+        sql = sql_;
+        allocator = &connection.db.allocator;
+        con = connection.con;
+        //prepare();
+    }
+
+    ~this() {
+        for(int i = 0; i != bindValue.length; ++i) {
+            auto ptr = bindValue[i];
+            auto length = bindLength[i];
+            allocator.deallocate(ptr[0..length]);
+        }
+    }
 
     void bind(int n, int value) {
     }
@@ -149,426 +131,319 @@ struct Statement(T) {
     void bind(int n, const char[] value) {
     }
 
-    int binds() {return cast(int) data_.bindValue.length;} // fix
+    void query() {
+        info("query sql: ", sql);
 
-    private:
-
-    struct Payload {
-        this(this) { assert(false); }
-        void opAssign(Statement.Payload rhs) { assert(false); }
-
-        Connection!T connection;
-        string sql;
-        Allocator *allocator;
-        PGconn *con;
-        string name;
-        PGresult *prepareRes;
-        PGresult *res;
-
-        Array!(char*) bindValue;
-        Array!(Oid) bindType;
-        Array!(int) bindLength;
-        Array!(int) bindFormat;
-
-        this(Connection!T connection_, string sql_) {
-            connection = connection_;
-            sql = sql_;
-            allocator = &connection.data_.db.data_.allocator;
-            con = connection.data_.con;
-            //prepare();
-        }
-        ~this() {
-            for(int i = 0; i != bindValue.length; ++i) {
-                auto ptr = bindValue[i];
-                auto length = bindLength[i];
-                allocator.deallocate(ptr[0..length]);
-            }
-        }
-
-        void query() {
-            info("query sql: ", sql);
-
-            if (1) {
-                if (!prepareRes) prepare();
-
-                auto n = bindValue.length;
-                int resultFormat = 1;
-
-                res = PQexecPrepared(
-                        con,
-                        toStringz(name),
-                        cast(int) n,
-                        n ? cast(const char **) &bindValue[0] : null,
-                        n ? cast(int*) &bindLength[0] : null,
-                        n ? cast(int*) &bindFormat[0] : null,
-                        resultFormat);
-
-            } else {
-                if (!PQsendQuery(con, toStringz(sql))) throw error("PQsendQuery");
-                res = PQgetResult(con);
-            }
-
-            // problem with PQsetSingleRowMode and prepared statements
-            // if (!PQsetSingleRowMode(con)) throw error("PQsetSingleRowMode");
-        }
-
-        void query(X...) (X args) {
-            info("query sql: ", sql);
-
-            // todo: stack allocation
-
-            bindValue.clear();
-            bindType.clear();
-            bindLength.clear();
-            bindFormat.clear();
-
-            foreach (ref arg; args) bind(arg);
+        if (1) {
+            if (!prepareRes) prepare();
 
             auto n = bindValue.length;
+            int resultFormat = 1;
 
-            /*
-               types must be set in prepared
-               res = PQexecPrepared(
-               con,
-               toStringz(name),
-               cast(int) n,
-               n ? cast(const char **) &bindValue[0] : null,
-               n ? cast(int*) &bindLength[0] : null,
-               n ? cast(int*) &bindFormat[0] : null,
-               0);
-             */
-
-            int resultForamt = 0;
-
-            res = PQexecParams(
+            res = PQexecPrepared(
                     con,
-                    toStringz(sql),
+                    toStringz(name),
                     cast(int) n,
-                    n ? cast(Oid*) &bindType[0] : null,
                     n ? cast(const char **) &bindValue[0] : null,
                     n ? cast(int*) &bindLength[0] : null,
                     n ? cast(int*) &bindFormat[0] : null,
-                    resultForamt);
+                    resultFormat);
 
+        } else {
+            if (!PQsendQuery(con, toStringz(sql))) throw error("PQsendQuery");
+            res = PQgetResult(con);
         }
 
-        void bind(string v) {
-            import core.stdc.string: strncpy;
-            void[] s = allocator.allocate(v.length+1);
-            char *p = cast(char*) s.ptr;
-            strncpy(p, v.ptr, v.length);
-            p[v.length] = 0;
-            bindValue ~= p;
-            bindType ~= 0;
-            bindLength ~= 0;
-            bindFormat ~= 0;
-        }
-
-        void bind(int v) {
-            import std.bitmanip;
-            void[] s = allocator.allocate(int.sizeof);
-            *cast(int*) s.ptr = peek!(int, Endian.bigEndian)(cast(ubyte[]) (&v)[0..1]);
-            bindValue ~= cast(char*) s.ptr;
-            bindType ~= 23; //INT4OID
-            bindLength ~= cast(int) s.length;
-            bindFormat ~= 1;
-        }
-
-        void prepare()  {
-            const Oid* paramTypes;
-            prepareRes = PQprepare(
-                    con,
-                    toStringz(name),
-                    toStringz(sql),
-                    0,
-                    paramTypes);
-        }
-
-        auto error(string msg) {
-            import std.conv;
-            string s;
-            s ~= msg ~ ", " ~ to!string(PQerrorMessage(con));
-            return new DatabaseException(s);
-        }
+        // problem with PQsetSingleRowMode and prepared statements
+        // if (!PQsetSingleRowMode(con)) throw error("PQsetSingleRowMode");
     }
 
-    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    Data data_;
+    void query(X...) (X args) {
+        info("query sql: ", sql);
 
-    void prepare() {
+        // todo: stack allocation
+
+        bindValue.clear();
+        bindType.clear();
+        bindLength.clear();
+        bindFormat.clear();
+
+        foreach (ref arg; args) bind(arg);
+
+        auto n = bindValue.length;
+
+        /*
+           types must be set in prepared
+           res = PQexecPrepared(
+           con,
+           toStringz(name),
+           cast(int) n,
+           n ? cast(const char **) &bindValue[0] : null,
+           n ? cast(int*) &bindLength[0] : null,
+           n ? cast(int*) &bindFormat[0] : null,
+           0);
+         */
+
+        int resultForamt = 0;
+
+        res = PQexecParams(
+                con,
+                toStringz(sql),
+                cast(int) n,
+                n ? cast(Oid*) &bindType[0] : null,
+                n ? cast(const char **) &bindValue[0] : null,
+                n ? cast(int*) &bindLength[0] : null,
+                n ? cast(int*) &bindFormat[0] : null,
+                resultForamt);
     }
 
-    public:
+    int binds() {return cast(int) bindValue.length;} // fix
 
-    auto query() {
-        data_.query();
-        return result();
+    void bind(string v) {
+        import core.stdc.string: strncpy;
+        void[] s = allocator.allocate(v.length+1);
+        char *p = cast(char*) s.ptr;
+        strncpy(p, v.ptr, v.length);
+        p[v.length] = 0;
+        bindValue ~= p;
+        bindType ~= 0;
+        bindLength ~= 0;
+        bindFormat ~= 0;
     }
 
-    auto query(X...) (X args) {
-        data_.query(args);
-        return result();
+    void bind(int v) {
+        import std.bitmanip;
+        void[] s = allocator.allocate(int.sizeof);
+        *cast(int*) s.ptr = peek!(int, Endian.bigEndian)(cast(ubyte[]) (&v)[0..int.sizeof]);
+        bindValue ~= cast(char*) s.ptr;
+        bindType ~= INT4OID;
+        bindLength ~= cast(int) s.length;
+        bindFormat ~= 1;
     }
 
-    private:
+    void bind(Date v) {
+        /* utility functions take 8 byte values but DATEOID is a 4 byte value */
+        import std.bitmanip;
+        int[3] mdy;
+        mdy[0] = v.month;
+        mdy[1] = v.day;
+        mdy[2] = v.year;
+        long d;
+        PGTYPESdate_mdyjul(&mdy[0], &d);
+        void[] s = allocator.allocate(4);
+        *cast(int*) s.ptr = peek!(int, Endian.bigEndian)(cast(ubyte[]) (&d)[0..4]);
+        bindValue ~= cast(char*) s.ptr;
+        bindType ~= DATEOID;
+        bindLength ~= cast(int) s.length;
+        bindFormat ~= 1;
+    }
 
-    void bindAll(T...) (T args) {
-        int col;
-        foreach (arg; args) {
-            bind(++col, arg);
-        }
+    void prepare()  {
+        const Oid* paramTypes;
+        prepareRes = PQprepare(
+                con,
+                toStringz(name),
+                toStringz(sql),
+                0,
+                paramTypes);
+    }
+
+    auto error(string msg) {
+        import std.conv;
+        string s;
+        s ~= msg ~ ", " ~ to!string(PQerrorMessage(con));
+        return new DatabaseException(s);
     }
 
     void reset() {
-        //SQLCloseCursor
     }
 }
 
 struct Describe(T) {
-    int type;
+    int dbType;
     int fmt;
 }
 
 
-struct Bind {
-    int type;
-    int fmt;
-    void *data;
-    int len;
-    int isNull; 
+struct Bind(T) {
+    ValueType type;
+    int idx;
+    //int fmt;
+    //int len;
+    //int isNull; 
 }
 
-struct Result(T) {
+struct ResultImpl(T) {
     alias Allocator = T.Allocator;
     alias Describe = .Describe!T;
-    //alias Bind = .Bind!T;
-    //alias Statement = .Statement!T;
-    //alias ResultRange = .ResultRange!T;
-    //alias Range = ResultRange;
-    //alias Row = .Row;
+    alias Statement = .StatementImpl!T;
+    alias Bind = .Bind!T;
 
-    this(Statement!T stmt) {
-        data_ = Data(stmt);
+    Statement* stmt;
+    PGconn *con;
+    PGresult *res;
+    int columns;
+    Array!Describe describe;
+    ExecStatusType status;
+    int row;
+    int rows;
+
+    // artifical bind array (for now)
+    Array!Bind bind;
+
+    this(Statement* stmt_) {
+        stmt = stmt_;
+        con = stmt.con;
+        res = stmt.res;
+
+        if (!setup()) return;
+        build_describe();
+        build_bind();
     }
 
-    int columns() {return data_.columns;}
+    ~this() {
+        if (res) close();
+    }
 
-    auto opSlice() {return ResultRange!T(this);}
+    bool setup() {
+        if (!res) {
+            info("no result");
+            return false;
+        }
+        status = PQresultStatus(res);
+        rows = PQntuples(res);
+
+        // not handling PGRESS_SINGLE_TUPLE yet
+        if (status == PGRES_COMMAND_OK) {
+            close();
+            return false;
+        } else if (status == PGRES_EMPTY_QUERY) {
+            close();
+            return false;
+        } else if (status == PGRES_TUPLES_OK) {
+            return true;
+        } else throw error(res,status);
+    }
+
+
+    void build_describe() {
+        // called after next()
+        columns = PQnfields(res);
+        for (int col = 0; col != columns; col++) {
+            describe ~= Describe();
+            auto d = &describe.back();
+            d.dbType = cast(int) PQftype(res, col);
+            d.fmt = PQfformat(res, col);
+        }
+    }
+
+    void build_bind() {
+        // artificial bind setup
+        bind.reserve(columns);
+        for(int i = 0; i < columns; ++i) {
+            auto d = &describe[i];
+            bind ~= Bind();
+            auto b = &bind.back();
+            b.type = ValueType.String;
+            b.idx = i;
+            switch(d.dbType) {
+                case VARCHAROID: b.type = ValueType.String; break;
+                case INT4OID: b.type = ValueType.Int; break;
+                case DATEOID: b.type = ValueType.Date; break;
+                default: throw new DatabaseException("unsupported type");
+            }
+        }
+    }
 
     //bool start() {return data_.status == PGRES_SINGLE_TUPLE;}
-    bool start() {return data_.row != data_.rows;}
-    bool next() {return data_.next();}
+    bool start() {return row != rows;}
 
-    struct Payload {
-        Statement!T stmt;
-        PGconn *con;
-        PGresult *res;
-        int columns;
-        Array!Describe describe;
-        Array!Bind bind;
-        ExecStatusType status;
-        int row;
-        int rows;
-
-        this(Statement!T stmt_) {
-            stmt = stmt_;
-            con = stmt.data_.con;
-            res = stmt.data_.res;
-
-            if (!setup()) return;
-            build_describe();
-            build_bind();
-        }
-
-        ~this() {
-            if (res) close();
-        }
-
-        void build_describe() {
-            // called after next()
-            columns = PQnfields(res);
-            for (int col = 0; col != columns; col++) {
-                describe ~= Describe();
-                auto d = &describe.back();
-                d.type = cast(int) PQftype(res, col);
-                d.fmt = PQfformat(res, col);
-            }
-        }
-
-        void build_bind() {
-        }
-
-        bool setup() {
-            if (!res) {
-                info("no result");
-                return false;
-            }
-            status = PQresultStatus(res);
-            rows = PQntuples(res);
-
-            // not handling PGRESS_SINGLE_TUPLE yet
-            if (status == PGRES_COMMAND_OK) {
-                close();
-                return false;
-            } else if (status == PGRES_EMPTY_QUERY) {
-                close();
-                return false;
-            } else if (status == PGRES_TUPLES_OK) {
-                return true;
-            } else throw error(status);
-        }
-
-        bool next() {
-            return ++row != rows;
-        }
-
-        bool singleRownext() {
-            if (res) PQclear(res);
-            res = PQgetResult(con);
-            if (!res) return false;
-            status = PQresultStatus(res);
-
-            if (status == PGRES_COMMAND_OK) {
-                close();
-                return false;
-            } else if (status == PGRES_SINGLE_TUPLE) return true;
-            else if (status == PGRES_TUPLES_OK) {
-                close();
-                return false;
-            } else throw error(status);
-        }
-
-
-
-        void close() {
-            if (!res) throw error("couldn't close result: result was not open");
-            res = PQgetResult(con);
-            if (res) throw error("couldn't close result: was not finished");
-            res = null;
-        }
-
-        auto error(string msg) {
-            return new DatabaseException(msg);
-        }
-
-        auto error(ExecStatusType status) {
-            import std.conv;
-            string s = "result error: " ~ to!string(PQresStatus(status));
-            return new DatabaseException(s);
-        }
-
-
-        this(this) { assert(false); }
-        void opAssign(Statement!T.Payload rhs) { assert(false); }
+    bool next() {
+        return ++row != rows;
     }
 
+    bool singleRownext() {
+        if (res) PQclear(res);
+        res = PQgetResult(con);
+        if (!res) return false;
+        status = PQresultStatus(res);
 
-    alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
-    Data data_;
-
-}
-
-struct ResultRange(T) {
-    // implements a One Pass Range
-    alias Result = .Result!T;
-    alias Row = .Row!T;
-
-    private Result result_;
-    private bool ok_;
-
-    this(Result result) {
-        result_ = result;
-        ok_ = result_.start();
+        if (status == PGRES_COMMAND_OK) {
+            close();
+            return false;
+        } else if (status == PGRES_SINGLE_TUPLE) return true;
+        else if (status == PGRES_TUPLES_OK) {
+            close();
+            return false;
+        } else throw error(status);
     }
 
-    bool empty() {
-        return !ok_;
+    void close() {
+        if (!res) throw error("couldn't close result: result was not open");
+        res = PQgetResult(con);
+        if (res) throw error("couldn't close result: was not finished");
+        res = null;
     }
 
-    Row front() {
-        return Row(&result_);
+    auto error(string msg) {
+        return new DatabaseException(msg);
     }
 
-    void popFront() {
-        ok_ = result_.next();
-    }
-}
-
-
-struct Row(T) {
-    alias Result = .Result!T;
-    alias Value = .Value;
-
-    this(Result* result) {
-        result_ = result;
+    auto error(ExecStatusType status) {
+        import std.conv;
+        string s = "result error: " ~ to!string(PQresStatus(status));
+        return new DatabaseException(s);
     }
 
-    int columns() {return result_.columns();}
-
-    auto opIndex(int col) {
-        return Value!T(result_, col);
+    auto error(PGresult *res, ExecStatusType status) {
+        import std.conv;
+        const char* msg = PQresultErrorMessage(res);
+        string s =
+            "error: " ~ to!string(PQresStatus(status)) ~
+            ", message:" ~ to!string(msg);
+        return new DatabaseException(s);
     }
 
-    private Result* result_;
-}
+    /*
+       char[] get(X:char[])(Bind *b) {
+       auto ptr = cast(char*) b.data.ptr;
+       return ptr[0..b.length];
+       }
+     */
 
-
-struct Value(T) {
-    alias Result = .Result!T;
-    Result *result;
-    int column;
-    //Describe desceibe;
-
-    this(Result *result_, int column_) {
-        result = result_;
-        column = column_;
-        //describe = &result.data_.describe[column];
+    auto get(X:string)(Bind *b) {
+        checkType(type(b.idx),VARCHAROID);
+        immutable char *ptr = cast(immutable char*) data(b.idx);
+        return cast(string) ptr[0..len(b.idx)];
     }
 
-    auto as(X:int)() {
-        check(type,INT4OID);
-        auto p = cast(ubyte*) data;
-        return std.bitmanip.bigEndianToNative!int(p[0..int.sizeof]);
+    auto get(X:int)(Bind *b) {
+        import std.bitmanip;
+        checkType(type(b.idx),INT4OID);
+        auto p = cast(ubyte*) data(b.idx);
+        return bigEndianToNative!int(p[0..int.sizeof]);
     }
 
-    auto as(X:string)() {
-        check(type,VARCHAROID);
-        immutable char *ptr = cast(immutable char*) data;
-        return cast(string) ptr[0..len];
-    }
-
-    auto as(X:Date)() {
-        check(type,DATEOID);
-        auto p = cast(ubyte*) data;
-        int date = std.bitmanip.bigEndianToNative!uint(p[0..uint.sizeof]);
+    auto get(X:Date)(Bind *b) {
+        import std.bitmanip;
+        checkType(type(b.idx),DATEOID);
+        auto ptr = cast(ubyte*) data(b.idx);
+        int sz = len(b.idx);
+        date d = bigEndianToNative!uint(ptr[0..4]); // why not sz?
         int[3] mdy;
-        PGTYPESdate_julmdy(date, &mdy[0]);
+        PGTYPESdate_julmdy(d, &mdy[0]);
         return Date(mdy[2],mdy[0],mdy[1]);
     }
 
-    auto chars() {
-        // hack just to have working for now
-        import std.conv;
-        switch(type) {
-            case INT4OID: return to!string(as!int);
-            case VARCHAROID: return as!string;
-            case DATEOID: return to!string(as!Date);
-            default: throw new DatabaseException("not supported");
-        }
-    }
-
-    private:
-
-    void* data() {return PQgetvalue(result.data_.res, result.data_.row, column);}
-    bool isNull() {return PQgetisnull(result.data_.res, result.data_.row, column) != 0;}
-    int type() {return result.data_.describe[column].type;}
-    int fmt() {return result.data_.describe[column].fmt;}
-    int len() {return PQgetlength(result.data_.res, result.data_.row, column);}
-
-    void check(int a, int b) {
+    void checkType(int a, int b) {
         if (a != b) throw new DatabaseException("type mismatch");
     }
 
-}
+    void* data(int col) {return PQgetvalue(res, row, col);}
+    bool isNull(int col) {return PQgetisnull(res, row, col) != 0;}
+    int type(int col) {return describe[col].dbType;}
+    int fmt(int col) {return describe[col].fmt;}
+    int len(int col) {return PQgetlength(res, row, col);}
 
+}
 

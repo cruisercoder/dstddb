@@ -28,8 +28,9 @@ private void writeResultRange(T) (T range) {
 }
 
 struct QueryVariable(QueryVariableType t : QueryVariableType.Dollar) {
+    import std.conv;
     private int n = 1;
-    auto front() {return "$" ~ std.conv.to!string(n);}
+    auto front() {return "$" ~ to!string(n);}
     auto popFront() {++n;}
     auto next() {auto v = front(); popFront(); return v;}
 }

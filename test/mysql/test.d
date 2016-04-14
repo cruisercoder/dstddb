@@ -10,8 +10,6 @@ unittest {
     import std.database.testsuite;
     alias DB = Database!DefaultPolicy;
     testAll!DB("mysql");
-
-    dateTest();
 }
 
 unittest {
@@ -19,16 +17,7 @@ unittest {
     //con.query("select * from tuple").writeResult();
 }
 
-void dateTest() {
-    import std.datetime;
-    auto db = createDatabase("mysql://127.0.0.1/test");
-    auto con = db.connection();
-    con.query("drop table if exists d1");
-    con.query("create table d1(a date, b int)");
-    con.query("insert into d1 values('2015-01-01',123)");
-    auto rs = con.query("select * from d1");
-    assert(rs[].front()[0].as!Date == Date(2015,1,1));
-}
+//auto db = createDatabase("mysql://127.0.0.1/test");
 
 void perf1() {
     import std.datetime;

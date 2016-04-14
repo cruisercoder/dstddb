@@ -12,15 +12,16 @@ void testAll(Database) (string source) {
     auto db = Database(source);
 
     simpleInsertSelect(db);    
-    classicSelect(db);    
+
+    classicSelect(db); 
 
     fieldAccess(db);
 
     bindTest0(db);
     bindTest1(db);
     bindTest2(db);
-
     bindInsertTest(db);    
+    dateBindTest(db);
 
     cascadeTest(db);    
     connectionWithSourceTest(db);
@@ -35,11 +36,11 @@ void databaseCreation(Database) (string source) {
 void simpleInsertSelect(D) (D db) {
     info("simpleInsertSelect");
     create_score_table(db, "score");
+
     db.query("insert into score values('Person',123)");
 
     //writeResult(db.connection().statement("select * from score")); // maybe should work too?
     writeResult(db.connection().statement("select * from score").query());
-
 }
 
 void classicSelect(Database) (Database db) {
@@ -48,7 +49,8 @@ void classicSelect(Database) (Database db) {
     create_score_table(db, table);
     auto con = db.connection();
     auto result = con.query("select * from " ~ table);
-    foreach (r; result[]) {
+    auto range = result[];
+    foreach (r; range) {
         for(int c = 0; c != r.columns; ++c) {
             if (c) write(",");
             write("", r[c].chars()); // why fail when not .chars()?
@@ -74,6 +76,7 @@ void bindTest0(Database) (Database db) {
 
     QueryVariable!(Database.queryVariableType) v;
     auto res = db.connection().query("select name,score from t1 where score >= " ~ v.next(), 50);
+    //auto res = db.connection().query("select name,score from t1");
     assert(res.columns() == 2);
     writeResult(res[]);
 }
@@ -133,6 +136,27 @@ void bindInsertTest(Database) (Database db) {
     stmt.query("b",2);
     stmt.query("c",3);
     con.query("select * from score").writeResult();
+}
+
+void dateBindTest(Database) (Database db) {
+    // test date input and output binding
+    import std.datetime;
+    if (!db.dateBinding()) {
+        writeln("skip dateInputBindTest");
+        return;
+    }
+
+    auto d = Date(2016,2,3);
+    auto con = db.connection();
+    db.drop_table("d1");
+    con.query("create table d1(a date)");
+
+    QueryVariable!(Database.queryVariableType) v;
+    con.query("insert into d1 values(" ~ v.next() ~ ")", d);
+
+    auto rs = con.query("select * from d1");
+    //assert(rs[].front()[0].as!Date == d);
+    writeResult(rs[]);
 }
 
 void cascadeTest(Database) (Database db) {
@@ -195,6 +219,7 @@ void create_score_table(DB) (DB db, string table, bool data = true) {
                 "'" ~ names[i] ~ "'" ~ "," ~ to!string(scores[i]) ~ ")");
     }
 }
+
 
 // unused stuff
 //auto stmt = con.statement("select * from global_status where VARIABLE_NAME = ?", "UPTIME");
