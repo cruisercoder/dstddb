@@ -7,6 +7,7 @@ import std.typecons;
 import std.database.common;
 import std.database.pool;
 
+import std.database.allocator;
 
 /*
    require a specific minimum version of DMD (2.071)
@@ -31,25 +32,25 @@ struct BasicDatabase(T) {
     alias Impl = T;
     alias Allocator = Impl.Allocator;
     alias Connection = BasicConnection!(Impl.Connection);
-    //alias Pool = .Pool!(BasicDatabase,Connection);
+    alias Pool = .Pool!(Impl.Connection);
+    alias ScopedResource = .ScopedResource!Pool;
 
     alias queryVariableType = Impl.queryVariableType;
 
-    // temporary
     auto connection() {return Connection(this);}
     auto connection(string uri) {return Connection(this, uri);}
+
     void query(string sql) {connection().query(sql);}
 
-    bool bindable() {return data_.bindable();}
-    bool dateBinding() {return data_.dateBinding();}
+    bool bindable() {return data_.impl.bindable();}
+    bool dateBinding() {return data_.impl.dateBinding();}
 
     private struct Payload {
-        string defaultURI;
-        Allocator allocator;
-
+        Impl impl;
+        Pool pool;
         this(string defaultURI_) {
-            defaultURI = defaultURI_;
-            allocator = Allocator();
+            impl = Impl(defaultURI_);
+            pool = Pool(impl.poolEnable());
         }
     }
 
@@ -57,7 +58,7 @@ struct BasicDatabase(T) {
         data_ = Data(defaultURI);
     }
 
-    private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
+    private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
 
     private Data data_;
 }
@@ -68,26 +69,34 @@ struct BasicConnection(T) {
     alias Allocator = Impl.Allocator;
     alias Statement = BasicStatement!(Impl.Statement);
     alias Database = BasicDatabase!(Impl.Database);
+    alias Pool = Database.Pool;
+    alias ScopedResource = Database.ScopedResource;
 
     auto statement(string sql) {return Statement(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement(this,sql,args);}
     auto query(string sql) {return statement(sql).query();}
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
-    private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
+    //private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
+    private alias RefCounted!(ScopedResource, RefCountedAutoInitialize.no) Data;
 
     //private Database db_; // problem (fix in 2.072)
     private Data data_;
+    private Pool* pool_;
 
     this(Database db, string uri="") {
         //db_ = db;
-        data_ = Data(&db.data_.refCountedPayload(),uri);
+        pool_ = &db.data_.pool;
+        Impl.Database* impl = &db.data_.refCountedPayload().impl;
+        data_ = Data(*pool_, pool_.acquire(impl, uri));
     }
 
+    /*
     this(Database db, ref Allocator allocator, string uri="") {
         //db_ = db;
         data_ = Data(&db.data_.refCountedPayload(),uri);
     }
+    */
 
 }
 
@@ -96,13 +105,15 @@ struct BasicStatement(T) {
     alias Connection = BasicConnection!(Impl.Connection);
     alias Result = BasicResult!(Impl.Result);
     alias Allocator = Impl.Allocator;
+    alias ScopedResource = Connection.ScopedResource;
 
     auto result() {return Result(this);}
     auto opSlice() {return result();} //fix
 
     this(Connection con, string sql) {
         con_ = con;
-        data_ = Data(&con.data_.refCountedPayload(),sql);
+        Impl.Connection* c = con_.data_.resource.resource;
+        data_ = Data(c,sql);
         prepare();
     }
 

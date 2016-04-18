@@ -4,7 +4,6 @@ pragma(lib, "odbc");
 import std.database.common;
 import std.database.exception;
 import std.database.resolver;
-import std.database.pool;
 import etc.c.odbc.sql;
 import etc.c.odbc.sqlext;
 import etc.c.odbc.sqltypes;
@@ -50,10 +49,10 @@ struct DatabaseImpl(T) {
     alias Allocator = T.Allocator;
     alias Connection = .ConnectionImpl!T;
     alias queryVariableType = QueryVariableType.QuestionMark;
-    //alias ConnectionPool = Pool!(Connection!T);
 
     bool bindable() {return false;}
     bool dateBinding() {return false;}
+    bool poolEnable() {return true;}
 
     string defaultURI;
     Allocator allocator;
@@ -77,7 +76,7 @@ struct DatabaseImpl(T) {
     ~this() {
         info("~DatabaseImpl");
         if (!env) return;
-        check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_ENV, env));
+        check("SQLFreeHandle", SQL_HANDLE_ENV, env, SQLFreeHandle(SQL_HANDLE_ENV, env));
         env = null;
     }
 

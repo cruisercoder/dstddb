@@ -92,6 +92,7 @@ struct DatabaseImpl(T) {
 
     bool bindable() {return false;}
     bool dateBinding() {return false;}
+    bool poolEnable() {return false;}
 }
 
 struct ConnectionImpl(T) {

@@ -47,6 +47,7 @@ struct DatabaseImpl(T) {
 
     bool bindable() {return true;}
     bool dateBinding() {return false;}
+    bool poolEnable() {return false;}
 
     // properties? 
 
