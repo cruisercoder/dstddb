@@ -40,7 +40,11 @@ struct BasicDatabase(T) {
     auto connection() {return Connection(this);}
     auto connection(string uri) {return Connection(this, uri);}
 
-    void query(string sql) {connection().query(sql);}
+    auto statement(string sql) {return connection().statement(sql);}
+    auto statement(X...) (string sql, X args) {return connection.statement(sql,args);}
+
+    auto query(string sql) {return connection().query(sql);}
+    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     bool bindable() {return data_.impl.bindable();}
     bool dateBinding() {return data_.impl.dateBinding();}

@@ -179,7 +179,7 @@ struct StatementImpl(T) {
                     cast(int) sql.length + 1, 
                     &st, 
                     null);
-            if (res != SQLITE_OK) error("prepare", res);
+            if (res != SQLITE_OK) throw_error(sq, "prepare", res);
             binds_ = sqlite3_bind_parameter_count(st);
         }
     }
@@ -194,7 +194,9 @@ struct StatementImpl(T) {
             hasRows = true;
         } else if (status == SQLITE_DONE) {
             reset();
-        } else throw new DatabaseException("step error");
+        } else {
+            throw_error(sq, "step error", status);
+        }
     }
 
     void query(X...) (X args) {
@@ -212,8 +214,6 @@ struct StatementImpl(T) {
         if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
     }
 
-    void error(string msg, int ret) {con.error(msg, ret);}
-
 }
 
 struct Bind(T) {
@@ -222,8 +222,6 @@ struct Bind(T) {
 }
 
 struct ResultImpl(T) {
-    //alias ResultRange = .ResultRange!T;
-    //alias Row = .Row!T;
     alias Statement = .StatementImpl!T;
     alias Bind = .Bind!T;
     alias Allocator = T.Allocator;
@@ -283,10 +281,10 @@ struct ResultImpl(T) {
 }
 
 void throw_error()(sqlite3 *sq, string msg, int ret) {
+    import std.conv;
     import core.stdc.string: strlen;
     const(char*) err = sqlite3_errmsg(sq);
-    info(msg, ":", err[0..strlen(err)]);
-    throw new DatabaseException("sqlite error: " ~ msg ~ ": "); // need to send err
+    throw new DatabaseException("sqlite error: " ~ msg ~ ": " ~ to!string(err)); // need to send err
 }
 
 void throw_error()(string label) {
@@ -306,17 +304,17 @@ void throw_error()(string label, char *msg) {
 
 /*
 
-auto as(T:string)() {
-import core.stdc.string: strlen;
-auto ptr = cast(immutable char*) sqlite3_column_text(result_.st_, cast(int) idx_);
-return cast(string) ptr[0..strlen(ptr)]; // fix with length
-}
+   auto as(T:string)() {
+   import core.stdc.string: strlen;
+   auto ptr = cast(immutable char*) sqlite3_column_text(result_.st_, cast(int) idx_);
+   return cast(string) ptr[0..strlen(ptr)]; // fix with length
+   }
 
-auto chars() {
-import core.stdc.string: strlen;
-auto data = sqlite3_column_text(result_.st_, cast(int) idx_);
-return data ? data[0 .. strlen(data)] : data[0..0];
-}
+   auto chars() {
+   import core.stdc.string: strlen;
+   auto data = sqlite3_column_text(result_.st_, cast(int) idx_);
+   return data ? data[0 .. strlen(data)] : data[0..0];
+   }
 
 // char*, string_ref?
 
@@ -325,7 +323,7 @@ const(char*) toStringz() {
 return sqlite3_column_text(result_.st_, cast(int) idx_);
 }
 
-*/
+ */
 
 extern(C) int sqlite_callback(void* cb, int howmany, char** text, char** columns) {
     return 0;

@@ -2,6 +2,7 @@ module std.database.pool;
 import std.container.array;
 import std.experimental.logger;
 import std.database.allocator;
+import core.thread;
 
 // not really a pool yet
 
@@ -52,21 +53,24 @@ struct Pool(T) {
 
     struct Resource {
         int id;
+        ThreadID tid;
         Res* resource;
-        this(int id_, Res* resource_) {
+        this(int id_, ThreadID tid_, Res* resource_) {
             id = id_;
+            tid = tid_;
             resource = resource_;
         }
     }
 
     auto acquire(A...)(auto ref A args) {
-        if (!enable_) return Resource(0, factory_.acquire(args));
+        ThreadID tid = Thread.getThis.id;
+        if (!enable_) return Resource(0, tid, factory_.acquire(args));
         if (!data.empty()) {
             //log("======= pool: return back");
-            return Resource(0, data.back.resource);
+            return Resource(0, tid, data.back.resource);
         }
-        //log("========== pool: create");
-        data ~= Resource(0,factory_.acquire(args));
+        //log("========== pool: create: ",tid);
+        data ~= Resource(0, tid, factory_.acquire(args));
         return data.back();
     }
 
@@ -81,7 +85,7 @@ struct Pool(T) {
 /*
    Scoped resource
    Useful for RefCounted
-*/
+ */
 
 struct ScopedResource(T) {
     alias Pool = T;
