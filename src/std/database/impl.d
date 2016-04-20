@@ -50,9 +50,11 @@ struct BasicDatabase(T) {
     bool dateBinding() {return data_.impl.dateBinding();}
 
     private struct Payload {
+        string defaultURI;
         Impl impl;
         Pool pool;
         this(string defaultURI_) {
+            defaultURI = defaultURI_;
             impl = Impl(defaultURI_);
             pool = Pool(impl.poolEnable());
         }
@@ -88,19 +90,21 @@ struct BasicConnection(T) {
     private Data data_;
     private Pool* pool_;
 
-    this(Database db, string uri="") {
+    this(Database db, string uri_="") {
         //db_ = db;
         pool_ = &db.data_.pool;
+
         Impl.Database* impl = &db.data_.refCountedPayload().impl;
+        string uri = uri_.length != 0 ? uri_ : db.data_.defaultURI;
         data_ = Data(*pool_, pool_.acquire(impl, uri));
     }
 
     /*
-    this(Database db, ref Allocator allocator, string uri="") {
-        //db_ = db;
-        data_ = Data(&db.data_.refCountedPayload(),uri);
-    }
-    */
+       this(Database db, ref Allocator allocator, string uri="") {
+//db_ = db;
+data_ = Data(&db.data_.refCountedPayload(),uri);
+}
+     */
 
 }
 

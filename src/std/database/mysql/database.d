@@ -64,11 +64,9 @@ struct DatabaseImpl(T) {
     alias Connection = .ConnectionImpl!T;
     alias queryVariableType = QueryVariableType.QuestionMark;
 
-    string defaultURI;
     Allocator allocator;
 
     this(string defaultURI_) {
-        defaultURI = defaultURI_;
         allocator = Allocator();
     }
 
@@ -90,7 +88,7 @@ struct ConnectionImpl(T) {
 
     this(DatabaseImpl!T *db_, string uri_) {
         db = db_;
-        uri = uri_.length == 0 ? db_.defaultURI : uri_;
+        uri = uri_;
 
         mysql = mysql_init(null);
         if (!mysql) {

@@ -37,7 +37,7 @@ void databaseCreation(Database) (string source) {
 
 void simpleInsertSelect(D) (D db) {
     info("simpleInsertSelect");
-    //create_score_table(db, "score");
+    create_score_table(db, "score");
 
     db.query("insert into score values('Person',123)");
 

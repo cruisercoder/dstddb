@@ -58,11 +58,7 @@ struct DatabaseImpl(T) {
        }
      */
 
-    string defaultSource;
-
     this(string defaultSource_) {
-        Allocator allocator;
-        defaultSource = defaultSource_;
     }
 }
 
@@ -72,13 +68,14 @@ struct ConnectionImpl(T) {
     alias Statement = .StatementImpl!T;
 
     Database* db;
+    string source;
     string path;
     sqlite3* sq;
 
     this(Database* db_, string source_) {
         db = db_;
+        source = source_;
 
-        auto source = source_.length == 0 ? db.defaultSource : source_;
         Source src = resolve(source);
 
         // map server to path while resolution rules are refined

@@ -44,11 +44,9 @@ struct DatabaseImpl(T) {
     static const auto queryVariableType = QueryVariableType.Dollar;
 
     Allocator allocator;
-    string defaultURI;
 
     this(string defaultURI_) {
         allocator = Allocator();
-        defaultURI = defaultURI_;
     }
 
     ~this() {
@@ -70,7 +68,7 @@ struct ConnectionImpl(T) {
 
     this(Database* db_, string source_) {
         db = db_;
-        source = source_.length == 0 ? db.defaultURI : source_;
+        source = source_;
 
         Source src = resolve(source);
         string conninfo;

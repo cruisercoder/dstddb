@@ -54,13 +54,11 @@ struct DatabaseImpl(T) {
     alias queryVariableType = QueryVariableType.Dollar;
 
     Allocator allocator;
-    string defaultURI;
     OCIEnv* env;
     OCIError *error;
 
     this(string defaultURI_) {
         allocator = Allocator();
-        defaultURI = defaultURI_;
         info("oracle: opening database");
         ub4 mode = OCI_THREADED | OCI_OBJECT;
 
@@ -108,7 +106,7 @@ struct ConnectionImpl(T) {
 
     this(Database* db_, string source_) {
         db = db_;
-        source = source_.length == 0 ? db.defaultURI : source_;
+        source = source_;
         error = db.error;
 
         Source src = resolve(source);
