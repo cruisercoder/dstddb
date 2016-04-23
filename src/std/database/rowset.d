@@ -25,7 +25,14 @@ struct RowSet {
         void *data;
     }
 
-    alias Converter = .Converter!RowSet;
+    struct Impl {
+        alias Result = .RowSet;
+        alias Bind = RowSet.Bind;
+    }
+
+    alias Converter = .Converter!Impl;
+
+
     struct TypeInfo(T:int) {static int type() {return ValueType.Int;}}
     struct TypeInfo(T:string) {static int type() {return ValueType.String;}}
     struct TypeInfo(T:Date) {static int type() {return ValueType.Date;}}

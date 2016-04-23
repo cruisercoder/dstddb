@@ -60,4 +60,3 @@ void perf1() {
     writeln("time: ", to!Duration(sw2.peek));
 }
 
-

@@ -4,6 +4,27 @@
     "copyright": "Copyright © 2015, Erik Smith",
     "authors": ["Erik Smith"],
     "license": "MIT",
-    "dependencies": {}
+    "dependencies": {
+        "dstddb:mysql": "*",
+        "dstddb:odbc": "*",
+        "dstddb:oracle": "*",
+        "dstddb:postgres": "*",
+        "dstddb:reference": "*",
+        "dstddb:sqlite": "*",
+        "dstddb:util": "*",
+        "dstddb:vibe": "*",
+        "dstddb:webscalesql": "*",
+    },
+    "subPackages": [
+        "./mysql/",
+        "./odbc/",
+        "./oracle/",
+        "./postgres/",
+        "./reference/",
+        "./sqlite/",
+        "./util/",
+        "./vibe/",
+        "./webscalesql/"
+    ],
 }
 

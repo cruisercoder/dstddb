@@ -3,7 +3,7 @@ pragma(lib, "odbc");
 
 import std.database.common;
 import std.database.exception;
-import std.database.resolver;
+import std.database.source;
 import etc.c.odbc.sql;
 import etc.c.odbc.sqlext;
 import etc.c.odbc.sqltypes;
@@ -29,24 +29,16 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl.Database!T);
-alias Connection(T) = BasicConnection!(Impl.Connection!T);
-alias Statement(T) = BasicStatement!(Impl.Statement!T);
-alias Result(T) = BasicResult!(Impl.Result!T);
-alias ResultRange(T) = BasicResultRange!(Impl.Result!T);
-alias Row(T) = BasicRow!(Impl.Result!T);
-alias Value(T) = BasicValue!(Impl.Result!T);
-
+alias Database(T) = BasicDatabase!(Impl!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-struct Impl {
+struct Impl(Policy) {
+    alias Allocator = Policy.Allocator;
 
-    struct Database(T) {
-        alias Allocator = T.Allocator;
-        alias Connection = Impl.Connection!T;
+    struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
         bool bindable() {return false;}
@@ -58,7 +50,6 @@ struct Impl {
 
         this(string defaultURI_) {
             info("Database");
-            defaultURI = defaultURI_;
             allocator = Allocator();
             check(
                     "SQLAllocHandle", 
@@ -105,17 +96,13 @@ struct Impl {
         }
     }
 
-    struct Connection(T) {
-        alias Allocator = T.Allocator;
-        alias Database = Impl.Database!T;
-        alias Statement = Impl.Statement!T;
-
+    struct Connection {
         Database* db;
-        string source;
+        Source source;
         SQLHDBC con;
         bool connected;
 
-        this(Database* db_, string source_) {
+        this(Database* db_, Source source_) {
             db = db_;
             source = source_;
 
@@ -125,8 +112,6 @@ struct Impl {
             SQLSMALLINT outstrlen;
             //string DSN = "DSN=testdb";
 
-            Source src = resolve(source);
-
             SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC,db.env,&con);
             if ((ret != SQL_SUCCESS) && (ret != SQL_SUCCESS_WITH_INFO)) {
                 throw new DatabaseException("SQLAllocHandle error: " ~ to!string(ret));
@@ -134,11 +119,11 @@ struct Impl {
 
             check("SQLConnect", SQL_HANDLE_DBC, con, SQLConnect(
                         con,
-                        cast(SQLCHAR*) toStringz(src.server),
+                        cast(SQLCHAR*) toStringz(source.server),
                         SQL_NTS,
-                        cast(SQLCHAR*) toStringz(src.username),
+                        cast(SQLCHAR*) toStringz(source.username),
                         SQL_NTS,
-                        cast(SQLCHAR*) toStringz(src.password),
+                        cast(SQLCHAR*) toStringz(source.password),
                         SQL_NTS));
             connected = true;
         }
@@ -150,12 +135,7 @@ struct Impl {
         }
     }
 
-    struct Statement(T) {
-        alias Connection = Impl.Connection!T;
-        alias Bind = Impl.Bind!T;
-        alias Result = Impl.Result!T;
-        alias Allocator = T.Allocator;
-
+    struct Statement {
         Connection* con;
         string sql;
         Allocator *allocator;
@@ -285,7 +265,7 @@ struct Impl {
     }
 
 
-    struct Describe(T) {
+    struct Describe {
         static const nameSize = 256;
         char[nameSize] name;
         SQLSMALLINT nameLen;
@@ -298,7 +278,7 @@ struct Impl {
         SQLLEN datLen;
     }
 
-    struct Bind(T) {
+    struct Bind {
         ValueType type;
 
         SQLSMALLINT bindType;
@@ -316,12 +296,7 @@ struct Impl {
         SQLINTEGER len;
     }
 
-    struct Result(T) {
-        alias Allocator = T.Allocator;
-        alias Statement = Impl.Statement!T;
-        alias Describe = Impl.Describe!T;
-        alias Bind = Impl.Bind!T;
-
+    struct Result {
         //int columns() {return columns;}
 
         static const maxData = 256;

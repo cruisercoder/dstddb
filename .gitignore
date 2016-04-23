@@ -1,0 +1,14 @@
+*.[oa]
+*.so
+*.lib
+*.dll
+
+.dub
+dub.selections.json
+
+.DS_Store
+
+#unit test binaries
+tests/*/tests
+__test__*__
+

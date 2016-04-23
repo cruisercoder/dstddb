@@ -13,7 +13,7 @@ Available in [DUB](https://code.dlang.org/packages/dstddb), the D package regist
 - A range interface for query result sets
 - Support a for [fluent](http://en.wikipedia.org/wiki/Fluent_interface) style interface
 - URL style connection strings
-- Reference implementations so far: mysql, sqlite, oracle, and ODBC
+- Reference implementations so far: ODBC, sqlite, mysql, oracle, postgres, freetds (MS SQL)
 - Support for allocators
 - Support for runtime driver registration
 - Input variable binding support
@@ -96,15 +96,4 @@ createDatabase("file:///demo.sqlite")
 ### Notes
 
 - The reference implementations use logging (std.experimental.logger). To hide the info logging, add this line to your package.json file: "versions": ["StdLoggerDisableInfo"].
-
-## Status
-
-    WIP
-
-    | Feature                         | sqlite | mysql  | oracle | postgres | odbc  | poly  |
-    | :---------------------------    | :----- | :----- | :----- | :------  | :---- | :---- |
-    | command only execution          | y      | y      | y      | y        | y     |       |
-    | select no-bind with results     | y      | y      | y      | y        | y     |       |
-    | input binding (string/int only) | y      | y      | y      | y        |       |       |
-    | native column type buffers      |        | y      |        |          |       |       |
 

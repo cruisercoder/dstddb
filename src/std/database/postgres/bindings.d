@@ -58,7 +58,8 @@ extern(System) {
     ExecStatusType PQresultStatus(const PGresult *res);
     char *PQresStatus(ExecStatusType status);
 
-    PGresult *PQexecParams(PGconn *conn,
+    PGresult *PQexecParams(
+            PGconn *conn,
             const char *command,
             int nParams,
             const Oid *paramTypes,
@@ -143,6 +144,61 @@ extern(System) {
 
     int PGTYPESnumeric_to_int(numeric *nv, int *ip);
 
-}
+    // non blocking calls
 
+    alias PostgresPollingStatusType = int;
+    enum {
+        PGRES_POLLING_FAILED = 0,
+        PGRES_POLLING_READING,		/* These two indicate that one may	  */
+        PGRES_POLLING_WRITING,		/* use select before polling again.   */
+        PGRES_POLLING_OK,
+        PGRES_POLLING_ACTIVE		/* unused; keep for awhile for backwards
+                                     * compatibility */
+    } 
+
+    PostgresPollingStatusType PQconnectPoll(PGconn *conn);
+
+    int	PQsocket(const PGconn *conn);
+
+    int PQsendQuery(PGconn *conn, const char *command);
+
+    int PQsendQueryParams(
+            PGconn *conn,
+            const char *command,
+            int nParams,
+            const Oid *paramTypes,
+            const char ** paramValues,
+            const int *paramLengths,
+            const int *paramFormats,
+            int resultFormat);
+
+    int PQsendQueryPrepared(
+            PGconn *conn,
+            const char *stmtName,
+            int nParams,
+            const char **paramValues,
+            const int *paramLengths,
+            const int *paramFormats,
+            int resultFormat);
+
+    int PQsendDescribePrepared(PGconn *conn, const char *stmtName);
+    int	PQsendDescribePrepared(PGconn *conn, const char *stmt);
+    int PQconsumeInput(PGconn *conn);
+    int PQisBusy(PGconn *conn);
+    int PQsetnonblocking(PGconn *conn, int arg);
+    int PQisnonblocking(const PGconn *conn);
+
+    int	PQflush(PGconn *conn);
+
+    struct PGnotify {
+        char* relname;
+        int be_pid;
+        char* extra;
+        private PGnotify* next;
+    }
+
+    PGnotify *PQnotifies(PGconn *conn);
+    void PQfreemem(void *ptr);
+
+}
 

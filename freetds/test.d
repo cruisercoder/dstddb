@@ -11,16 +11,21 @@ unittest {
     alias DB = Database!DefaultPolicy;
     testAll!DB("freetds");
 
-    //simpleTest();
+    //example();
     //backTest();
 }
-void simpleTest() {
-    auto db = createDatabase("freetds://server/test?username=sa&password=admin");
-    string sql = "12 SELEC 1,2,3"; // error check
-    //string sql = "SELECT  * FROM master.dbo.spt_monitor";
-    writeResult(db.query(sql));
+
+void example() {
+    import std.database.freetds;
+    //auto db = createDatabase("freetds://server/test?username=sa&password=admin");
+    auto db = createDatabase("freetds://10.211.55.3:1433/test?username=sa&password=admin");
+    auto result = db.query("SELECT 1,2,'abc'");
+    foreach (r; result) {
+        for(int c = 0; c != r.columns; ++c) writeln("column: ",c,", value: ",r[c].as!string);
+    }
 }
 
+/*
 void backTest() {
     //string sql = "SELECT  * FROM dbo.spt_monitor";
     string sql = "SELECT 1,2,3";
@@ -36,5 +41,6 @@ void backTest() {
         writeln("second: ", result.get!string(&result.bind[1]));
     } while (result.next());
 }
+*/
 
 

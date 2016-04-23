@@ -69,9 +69,19 @@ extern(System) {
         uint type; /* Type of field. See mysql_com.h for types */
         // type is actually an enum btw
 
-        version(MySQL_51) {
-            void* extension;
+        //version(MySQL_51) {
+        void* extension;
+        //}
+
+        version (webscalesql) {
+            /* The position in buff we continue reads from when data is next
+             * available */
+            ubyte *cur_pos;
+
+            /* Blocking state */
+            net_async_block_state async_blocking_state;
         }
+
     }
 
     struct MYSQL_BIND {
@@ -103,7 +113,8 @@ extern(System) {
 
     /* typedef */ alias cstring* MYSQL_ROW;
 
-    cstring mysql_get_client_info();
+    const(char *) mysql_get_client_info();
+
     MYSQL* mysql_init(MYSQL*);
     uint mysql_errno(MYSQL*);
     cstring mysql_error(MYSQL*);
@@ -164,6 +175,100 @@ extern(System) {
         my_bool neg;
         MYSQL_TIMESTAMP_TYPE time_type;
     };
+
+    version (webscalesql) {
+
+        /* Is the async operation still pending? */
+        enum net_async_status_enum {
+            NET_ASYNC_COMPLETE = 20100,
+            NET_ASYNC_NOT_READY
+        };
+        alias net_async_status_enum net_async_status;
+
+        /* For an async operation, what we are waiting for, if anything. */
+        enum net_async_operation_enum {
+            NET_ASYNC_OP_IDLE = 0,
+            NET_ASYNC_OP_READING = 20200,
+            NET_ASYNC_OP_WRITING,
+            NET_ASYNC_OP_COMPLETE
+        };
+        alias net_async_operation_enum net_async_operation;
+
+        /* Reading a packet is a multi-step process, so we have a state machine. */
+        enum net_async_read_packet_state_enum {
+            NET_ASYNC_PACKET_READ_IDLE = 0,
+            NET_ASYNC_PACKET_READ_HEADER = 20300,
+            NET_ASYNC_PACKET_READ_BODY,
+            NET_ASYNC_PACKET_READ_COMPLETE
+        };
+        alias net_async_read_packet_state_enum net_async_read_packet_state;
+
+        /* As is reading a query result. */
+        enum net_read_query_result_status_enum {
+            NET_ASYNC_READ_QUERY_RESULT_IDLE = 0,
+            NET_ASYNC_READ_QUERY_RESULT_FIELD_COUNT = 20240,
+            NET_ASYNC_READ_QUERY_RESULT_FIELD_INFO
+        };
+        alias net_read_query_result_status_enum net_read_query_result_status;
+
+        /* Sending a command involves the write as well as reading the status. */
+        enum net_send_command_status_enum {
+            NET_ASYNC_SEND_COMMAND_IDLE = 0,
+            NET_ASYNC_SEND_COMMAND_WRITE_COMMAND = 20340,
+            NET_ASYNC_SEND_COMMAND_READ_STATUS = 20340
+        };
+        alias net_send_command_status_enum net_send_command_status;
+
+        enum net_async_block_state_enum {
+            NET_NONBLOCKING_CONNECT = 20130,
+            NET_NONBLOCKING_READ = 20140,
+            NET_NONBLOCKING_WRITE = 20150
+        };
+
+        alias net_async_block_state_enum net_async_block_state;
+
+        MYSQL* mysql_real_connect_nonblocking_init(
+                MYSQL *mysql,
+                cstring host,
+                cstring user,
+                cstring passwd,
+                cstring db,
+                uint port,
+                cstring unix_socket,
+                c_ulong clientflag);
+
+        net_async_status mysql_real_connect_nonblocking_run(
+                MYSQL *mysql,
+                int *error);
+
+        net_async_status mysql_send_query_nonblocking(
+                MYSQL* mysql, 
+                const char* query, 
+                int *error);
+
+        net_async_status mysql_real_query_nonblocking(
+                MYSQL *mysql,
+                const char* query,
+                ulong length,
+                int *error);
+
+        net_async_status mysql_next_result_nonblocking(
+                MYSQL *mysql,
+                int* error);
+
+        net_async_status mysql_select_db_nonblocking(
+                MYSQL *mysql,
+                const char *db,
+                my_bool* error);
+
+        int mysql_get_file_descriptor(MYSQL *mysql);
+
+        net_async_status mysql_free_result_nonblocking(MYSQL_RES *result);
+
+        net_async_status mysql_fetch_row_nonblocking(
+                MYSQL_RES *res,
+                MYSQL_ROW* row);
+    }
 
 }
 

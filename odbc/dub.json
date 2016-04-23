@@ -1,0 +1,26 @@
+{
+    "name": "odbc",
+    "description": "Phobos std.database candidate",
+    "homepage": "",
+    "copyright": "Copyright © 2015-, Erik Smith",
+    "authors": [
+        "Erik Smith"
+    ],
+    "sourcePaths": [".", "../src"],
+    "libs" : ["odbc","sqlite3"],
+    "dependencies": {
+    },
+    "configurations": [
+    {
+        "name": "library",
+        "targetType": "executable",
+    },
+    {
+        "name": "unittest",
+        "targetType": "executable",
+        "targetName": "unittest",
+        "dflags": ["-main"],
+    },
+    ],
+}
+

@@ -1,20 +1,15 @@
 {
-    "name": "std_database_freetds",
+    "name": "webscalesql",
     "description": "Phobos std.database candidate",
     "homepage": "",
     "copyright": "Copyright © 2015-, Erik Smith",
     "authors": [
         "Erik Smith"
     ],
-    "sourcePaths": [".", "../../src"],
-    "libs" : ["sybdb"],
-    "dependencies": {
-    },
+    "sourcePaths": [".", "../src"],
+    "libs" : ["webscalesqlclient"],
+    "versions": ["webscalesql"],
     "configurations": [
-    {
-        "name": "library",
-        "targetType": "executable",
-    },
     {
         "name": "unittest",
         "targetType": "executable",

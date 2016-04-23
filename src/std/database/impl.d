@@ -6,8 +6,11 @@ import std.datetime;
 import std.typecons;
 import std.database.common;
 import std.database.pool;
+import std.database.resolver;
+import std.database.source;
 
 import std.database.allocator;
+import std.traits;
 
 /*
    require a specific minimum version of DMD (2.071)
@@ -28,14 +31,16 @@ enum ValueType {
     Date,
 }
 
-struct BasicDatabase(T) {
-    alias Impl = T;
-    alias Allocator = Impl.Allocator;
-    alias Connection = BasicConnection!(Impl.Connection);
+struct BasicDatabase(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias Database = Impl.Database;
+    alias Allocator = Policy.Allocator;
+    alias Connection = BasicConnection!(Impl,Policy);
     alias Pool = .Pool!(Impl.Connection);
     alias ScopedResource = .ScopedResource!Pool;
 
-    alias queryVariableType = Impl.queryVariableType;
+    alias queryVariableType = Database.queryVariableType;
 
     auto connection() {return Connection(this);}
     auto connection(string uri) {return Connection(this, uri);}
@@ -51,11 +56,11 @@ struct BasicDatabase(T) {
 
     private struct Payload {
         string defaultURI;
-        Impl impl;
+        Database impl;
         Pool pool;
         this(string defaultURI_) {
             defaultURI = defaultURI_;
-            impl = Impl(defaultURI_);
+            impl = Database(defaultURI_);
             pool = Pool(impl.poolEnable());
         }
     }
@@ -70,33 +75,55 @@ struct BasicDatabase(T) {
 }
 
 
-struct BasicConnection(T) {
-    alias Impl = T;
-    alias Allocator = Impl.Allocator;
-    alias Statement = BasicStatement!(Impl.Statement);
-    alias Database = BasicDatabase!(Impl.Database);
+struct BasicConnection(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias ConnectionImpl = Impl.Connection;
+    alias Statement = BasicStatement!(Impl,Policy);
+    alias Database = BasicDatabase!(Impl,Policy);
     alias Pool = Database.Pool;
     alias ScopedResource = Database.ScopedResource;
+    alias DatabaseImpl = Impl.Database;
 
     auto statement(string sql) {return Statement(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement(this,sql,args);}
     auto query(string sql) {return statement(sql).query();}
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
-    //private alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
     private alias RefCounted!(ScopedResource, RefCountedAutoInitialize.no) Data;
 
     //private Database db_; // problem (fix in 2.072)
     private Data data_;
     private Pool* pool_;
+    string uri_;
 
-    this(Database db, string uri_="") {
+    package this(Database db) {this(db,"");}
+
+    package this(Database db, string uri) {
         //db_ = db;
+        uri_ = uri.length != 0 ? uri : db.data_.defaultURI;
         pool_ = &db.data_.pool;
 
-        Impl.Database* impl = &db.data_.refCountedPayload().impl;
-        string uri = uri_.length != 0 ? uri_ : db.data_.defaultURI;
-        data_ = Data(*pool_, pool_.acquire(impl, uri));
+        Source source = resolve(uri_);
+
+        DatabaseImpl* impl = &db.data_.refCountedPayload().impl;
+        data_ = Data(*pool_, pool_.acquire(impl, source));
+    }
+
+    private auto impl() {
+        return data_.resource.resource;
+    }
+
+    static if (hasMember!(Database, "socket")) {
+        auto socket() {return impl.socket;}
+    }
+
+    // handle()
+    // be carful about Connection going out of scope or being destructed
+    // while a handle is in use  (Use a connection variable to extend scope)
+
+    static if (hasMember!(Database, "handle")) {
+        auto handle() {return impl.handle;}
     }
 
     /*
@@ -106,13 +133,16 @@ data_ = Data(&db.data_.refCountedPayload(),uri);
 }
      */
 
+
 }
 
-struct BasicStatement(T) {
-    alias Impl = T;
-    alias Connection = BasicConnection!(Impl.Connection);
-    alias Result = BasicResult!(Impl.Result);
-    alias Allocator = Impl.Allocator;
+struct BasicStatement(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias StatementImpl = Impl.Statement;
+    alias Connection = BasicConnection!(Impl,Policy);
+    alias Result = BasicResult!(Impl,Policy);
+    //alias Allocator = Impl.Policy.Allocator;
     alias ScopedResource = Connection.ScopedResource;
 
     auto result() {return Result(this);}
@@ -120,8 +150,7 @@ struct BasicStatement(T) {
 
     this(Connection con, string sql) {
         con_ = con;
-        Impl.Connection* c = con_.data_.resource.resource;
-        data_ = Data(c,sql);
+        data_ = Data(con_.impl,sql);
         prepare();
     }
 
@@ -151,8 +180,19 @@ struct BasicStatement(T) {
         return Result(this);
     }
 
+    // experimental async
+    /*
+       static if (hasMember!(Statement, "asyncQuery")) {
+       auto asyncQuery() {
+       data_.asyncQuery();
+       return Result(this);
+       }
+       }
+     */
+
+
     private:
-    alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
+    alias RefCounted!(StatementImpl, RefCountedAutoInitialize.no) Data;
 
     Data data_;
     Connection con_;
@@ -165,11 +205,14 @@ struct BasicStatement(T) {
 }
 
 
-struct BasicResult(T) {
-    alias Impl = T;
-    alias Statement = BasicStatement!(Impl.Statement);
-    alias ResultRange = BasicResultRange!BasicResult;
-    alias Allocator = Impl.Allocator;
+struct BasicResult(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias ResultImpl = Impl.Result;
+    alias Statement = BasicStatement!(Impl,Policy);
+    alias ResultRange = BasicResultRange!(Impl,Policy);
+    //alias Allocator = Impl.Policy.Allocator;
+    alias Bind = Impl.Bind;
     //alias Row = .Row;
 
     int columns() {return data_.columns;}
@@ -188,13 +231,15 @@ package:
     private:
     Statement stmt_;
 
-    alias RefCounted!(Impl, RefCountedAutoInitialize.no) Data;
+    alias RefCounted!(ResultImpl, RefCountedAutoInitialize.no) Data;
     Data data_;
 }
 
-struct BasicResultRange(T) {
-    alias Result = T;
-    alias Row = BasicRow!(Result);
+struct BasicResultRange(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias Result = BasicResult!(Impl,Policy);
+    alias Row = BasicRow!(Impl,Policy);
 
     private Result result_;
     private bool ok_;
@@ -209,9 +254,11 @@ struct BasicResultRange(T) {
     void popFront() {ok_ = result_.next();}
 }
 
-struct BasicRow(T) {
-    alias Result = T;
-    alias Value =  BasicValue!(Result.Impl);
+struct BasicRow(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias Result = BasicResult!(Impl,Policy);
+    alias Value = BasicValue!(Impl,Policy);
 
     this(Result* result) {
         result_ = result;
@@ -225,9 +272,10 @@ struct BasicRow(T) {
     private Result* result_;
 }
 
-struct BasicValue(T) {
-    alias Impl = T;
-    alias Result = Impl;
+struct BasicValue(I,P) {
+    alias Impl = I;
+    alias Policy = P;
+    alias Result = Impl.Result;
     alias Bind = Impl.Bind;
     private Result* result_;
     private Bind* bind_;
@@ -253,6 +301,10 @@ struct BasicValue(T) {
     auto chars() {return as!string();}
 }
 
+
+// extra stuff
+
+
 struct EfficientValue(T) {
     alias Impl = T.Impl;
     alias Bind = Impl.Bind;
@@ -274,8 +326,8 @@ struct TypeInfo(T:Date) {static auto type() {return ValueType.Date;}}
 
 
 struct Converter(T) {
-    alias Result = T;
-    alias Bind = Result.Bind;
+    alias Result = T.Result;
+    alias Bind = T.Bind;
 
     static Y convert(Y)(Result *r, Bind *b) {
         ValueType x = b.type, y = TypeInfo!Y.type;

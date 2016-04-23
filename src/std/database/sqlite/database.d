@@ -9,7 +9,7 @@ import etc.c.sqlite3;
 
 import std.database.common;
 import std.database.exception;
-import std.database.resolver;
+import std.database.source;
 import std.database.allocator;
 import std.database.pool;
 import std.experimental.logger;
@@ -24,13 +24,7 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(DatabaseImpl!T);
-alias Connection(T) = BasicConnection!(ConnectionImpl!T);
-alias Statement(T) = BasicStatement!(StatementImpl!T);
-alias Result(T) = BasicResult!(ResultImpl!T);
-alias ResultRange(T) = BasicResultRange!(Result!T);
-alias Row(T) = BasicRow!(ResultImpl!T);
-alias Value(T) = BasicValue!(ResultImpl!T);
+alias Database(T) = BasicDatabase!(Impl!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -40,288 +34,277 @@ auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
-struct DatabaseImpl(T) {
-    alias Allocator = T.Allocator;
-    alias Connection = .ConnectionImpl!T;
-    alias queryVariableType = QueryVariableType.QuestionMark;
+struct Impl(Policy) {
+    alias Allocator = Policy.Allocator;
 
-    bool bindable() {return true;}
-    bool dateBinding() {return false;}
-    bool poolEnable() {return false;}
+    struct Database {
+        alias queryVariableType = QueryVariableType.QuestionMark;
 
-    // properties? 
+        bool bindable() {return true;}
+        bool dateBinding() {return false;}
+        bool poolEnable() {return false;}
 
-    /*
-       string defaultSource() {
-       version (assert) if (!refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
-       return defaultSource;
-       }
-     */
+        // properties? 
 
-    this(string defaultSource_) {
-    }
-}
+        /*
+           string defaultSource() {
+           version (assert) if (!refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
+           return defaultSource;
+           }
+         */
 
-struct ConnectionImpl(T) {
-    alias Allocator = T.Allocator;
-    alias Database = .DatabaseImpl!T;
-    alias Statement = .StatementImpl!T;
-
-    Database* db;
-    string source;
-    string path;
-    sqlite3* sq;
-
-    this(Database* db_, string source_) {
-        db = db_;
-        source = source_;
-
-        Source src = resolve(source);
-
-        // map server to path while resolution rules are refined
-        path = src.path.length != 0 ? src.path : src.server; // fix
-
-        writeln("sqlite opening file: ", path);
-
-        int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
-        int rc = sqlite3_open_v2(toStringz(path), &sq, flags, null);
-        if (rc) {
-            writeln("error: rc: ", rc, sqlite3_errmsg(sq));
+        this(string defaultSource_) {
         }
     }
 
-    ~this() {
-        writeln("sqlite closing ", path);
-        if (sq) {
-            int rc = sqlite3_close(sq);
-            sq = null;
+    struct Connection {
+        Database* db;
+        Source source;
+        string path;
+        sqlite3* sq;
+
+        this(Database* db_, Source source_) {
+            db = db_;
+            source = source_;
+
+            // map server to path while resolution rules are refined
+            path = source.path.length != 0 ? source.path : source.server; // fix
+
+            writeln("sqlite opening file: ", path);
+
+            int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
+            int rc = sqlite3_open_v2(toStringz(path), &sq, flags, null);
+            if (rc) {
+                writeln("error: rc: ", rc, sqlite3_errmsg(sq));
+            }
         }
-    }
-}
 
-struct StatementImpl(T) {
-    alias Connection = .ConnectionImpl!T;
-    alias Bind = .Bind!T;
-    alias Result = .ResultImpl!T;
-    alias Allocator = T.Allocator;
-
-    enum State {
-        Init,
-        Execute,
-    }
-
-    Connection* con;
-    string sql;
-    State state;
-    sqlite3* sq;
-    sqlite3_stmt *st;
-    bool hasRows;
-    int binds_;
-
-    this(Connection* con_, string sql_) {
-        con = con_;
-        sql = sql_;
-        state = State.Init;
-        sq = con.sq;
-    }
-
-    ~this() {
-        //writeln("sqlite statement closing ", filename_);
-        if (st) {
-            int res = sqlite3_finalize(st);
-            st = null;
-        }
-    }
-
-    void bind(int col, int value){
-        int rc = sqlite3_bind_int(
-                st, 
-                col,
-                value);
-        if (rc != SQLITE_OK) {
-            throw_error("sqlite3_bind_int");
-        }
-    }
-
-    void bind(int col, const char[] value){
-        if(value is null) {
-            int rc = sqlite3_bind_null(st, col);
-            if (rc != SQLITE_OK) throw_error("bind1");
-        } else {
-            //cast(void*)-1);
-            int rc = sqlite3_bind_text(
-                    st, 
-                    col,
-                    value.ptr,
-                    cast(int) value.length,
-                    null);
-            if (rc != SQLITE_OK) {
-                writeln(rc);
-                throw_error("bind2");
+        ~this() {
+            writeln("sqlite closing ", path);
+            if (sq) {
+                int rc = sqlite3_close(sq);
+                sq = null;
             }
         }
     }
 
-    void bind(int n, Date d) {
-        throw new DatabaseException("Date input binding not yet implemented");
-    }
+    struct Statement {
 
-    int binds() {return binds_;}
-
-    void prepare() {
-        if (!st) { 
-            int res = sqlite3_prepare_v2(
-                    sq, 
-                    toStringz(sql), 
-                    cast(int) sql.length + 1, 
-                    &st, 
-                    null);
-            if (res != SQLITE_OK) throw_error(sq, "prepare", res);
-            binds_ = sqlite3_bind_parameter_count(st);
+        enum State {
+            Init,
+            Execute,
         }
-    }
 
-    void query() {
-        //if (state == State.Execute) throw new DatabaseException("already executed"); // restore
-        if (state == State.Execute) return;
-        state = State.Execute;
-        int status = sqlite3_step(st);
-        info("sqlite3_step: status: ", status);
-        if (status == SQLITE_ROW) {
-            hasRows = true;
-        } else if (status == SQLITE_DONE) {
-            reset();
-        } else {
-            throw_error(sq, "step error", status);
+        Connection* con;
+        string sql;
+        State state;
+        sqlite3* sq;
+        sqlite3_stmt *st;
+        bool hasRows;
+        int binds_;
+
+        this(Connection* con_, string sql_) {
+            con = con_;
+            sql = sql_;
+            state = State.Init;
+            sq = con.sq;
         }
-    }
 
-    void query(X...) (X args) {
-        bindAll(args);
-        query();
-    }
-
-    private void bindAll(T...) (T args) {
-        int col;
-        foreach (arg; args) bind(++col, arg);
-    }
-
-    void reset() {
-        int status = sqlite3_reset(st);
-        if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
-    }
-
-}
-
-struct Bind(T) {
-    ValueType type;
-    int idx;
-}
-
-struct ResultImpl(T) {
-    alias Statement = .StatementImpl!T;
-    alias Bind = .Bind!T;
-    alias Allocator = T.Allocator;
-
-    private Statement* stmt_;
-    private sqlite3_stmt *st_;
-    int columns;
-    int status_;
-
-    // artifical bind array (for now)
-    Array!Bind bind;
-
-    this(Statement* stmt) {
-        stmt_ = stmt;
-        st_ = stmt_.st;
-        columns = sqlite3_column_count(st_);
-
-        // artificial bind setup
-        bind.reserve(columns);
-        for(int i = 0; i < columns; ++i) {
-            bind ~= Bind();
-            auto b = &bind.back();
-            b.type = ValueType.String;
-            b.idx = i;
+        ~this() {
+            //writeln("sqlite statement closing ", filename_);
+            if (st) {
+                int res = sqlite3_finalize(st);
+                st = null;
+            }
         }
-    }
 
-    //~this() {}
-
-    bool start() {return stmt_.hasRows;}
-
-    bool next() {
-        status_ = sqlite3_step(st_);
-        if (status_ == SQLITE_ROW) return true;
-        if (status_ == SQLITE_DONE) {
-            stmt_.reset();
-            return false;
+        void bind(int col, int value){
+            int rc = sqlite3_bind_int(
+                    st, 
+                    col,
+                    value);
+            if (rc != SQLITE_OK) {
+                throw_error("sqlite3_bind_int");
+            }
         }
-        //throw new DatabaseException("sqlite3_step error: status: " ~ to!string(status_));
-        throw new DatabaseException("sqlite3_step error: status: ");
+
+        void bind(int col, const char[] value){
+            if(value is null) {
+                int rc = sqlite3_bind_null(st, col);
+                if (rc != SQLITE_OK) throw_error("bind1");
+            } else {
+                //cast(void*)-1);
+                int rc = sqlite3_bind_text(
+                        st, 
+                        col,
+                        value.ptr,
+                        cast(int) value.length,
+                        null);
+                if (rc != SQLITE_OK) {
+                    writeln(rc);
+                    throw_error("bind2");
+                }
+            }
+        }
+
+        void bind(int n, Date d) {
+            throw new DatabaseException("Date input binding not yet implemented");
+        }
+
+        int binds() {return binds_;}
+
+        void prepare() {
+            if (!st) { 
+                int res = sqlite3_prepare_v2(
+                        sq, 
+                        toStringz(sql), 
+                        cast(int) sql.length + 1, 
+                        &st, 
+                        null);
+                if (res != SQLITE_OK) throw_error(sq, "prepare", res);
+                binds_ = sqlite3_bind_parameter_count(st);
+            }
+        }
+
+        void query() {
+            //if (state == State.Execute) throw new DatabaseException("already executed"); // restore
+            if (state == State.Execute) return;
+            state = State.Execute;
+            int status = sqlite3_step(st);
+            info("sqlite3_step: status: ", status);
+            if (status == SQLITE_ROW) {
+                hasRows = true;
+            } else if (status == SQLITE_DONE) {
+                reset();
+            } else {
+                throw_error(sq, "step error", status);
+            }
+        }
+
+        void query(X...) (X args) {
+            bindAll(args);
+            query();
+        }
+
+        private void bindAll(T...) (T args) {
+            int col;
+            foreach (arg; args) bind(++col, arg);
+        }
+
+        void reset() {
+            int status = sqlite3_reset(st);
+            if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
+        }
+
     }
 
-    auto get(X:string)(Bind *b) {
+    struct Bind {
+        ValueType type;
+        int idx;
+    }
+
+    struct Result {
+        private Statement* stmt_;
+        private sqlite3_stmt *st_;
+        int columns;
+        int status_;
+
+        // artifical bind array (for now)
+        Array!Bind bind;
+
+        this(Statement* stmt) {
+            stmt_ = stmt;
+            st_ = stmt_.st;
+            columns = sqlite3_column_count(st_);
+
+            // artificial bind setup
+            bind.reserve(columns);
+            for(int i = 0; i < columns; ++i) {
+                bind ~= Bind();
+                auto b = &bind.back();
+                b.type = ValueType.String;
+                b.idx = i;
+            }
+        }
+
+        //~this() {}
+
+        bool start() {return stmt_.hasRows;}
+
+        bool next() {
+            status_ = sqlite3_step(st_);
+            if (status_ == SQLITE_ROW) return true;
+            if (status_ == SQLITE_DONE) {
+                stmt_.reset();
+                return false;
+            }
+            //throw new DatabaseException("sqlite3_step error: status: " ~ to!string(status_));
+            throw new DatabaseException("sqlite3_step error: status: ");
+        }
+
+        auto get(X:string)(Bind *b) {
+            import core.stdc.string: strlen;
+            auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) b.idx);
+            return cast(string) ptr[0..strlen(ptr)]; // fix with length
+        }
+
+        auto get(X:int)(Bind *b) {
+            return sqlite3_column_int(st_, cast(int) b.idx);
+        }
+
+        auto get(X:Date)(Bind *b) {
+            return Date(2016,1,1); // fix
+        }
+
+    }
+
+    private static void throw_error()(sqlite3 *sq, string msg, int ret) {
+        import std.conv;
         import core.stdc.string: strlen;
-        auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) b.idx);
-        return cast(string) ptr[0..strlen(ptr)]; // fix with length
+        const(char*) err = sqlite3_errmsg(sq);
+        throw new DatabaseException("sqlite error: " ~ msg ~ ": " ~ to!string(err)); // need to send err
     }
 
-    auto get(X:int)(Bind *b) {
-        return sqlite3_column_int(st_, cast(int) b.idx);
+    private static void throw_error()(string label) {
+        throw new DatabaseException(label);
     }
 
-    auto get(X:Date)(Bind *b) {
-        return Date(2016,1,1); // fix
+    private static void throw_error()(string label, char *msg) {
+        // frees up pass char * as required by sqlite
+        import core.stdc.string : strlen;
+        char[] m;
+        sizediff_t sz = strlen(msg);
+        m.length = sz;
+        for(int i = 0; i != sz; i++) m[i] = msg[i];
+        sqlite3_free(msg);
+        throw new DatabaseException(label ~ m.idup);
     }
 
-}
+    /*
 
-void throw_error()(sqlite3 *sq, string msg, int ret) {
-    import std.conv;
-    import core.stdc.string: strlen;
-    const(char*) err = sqlite3_errmsg(sq);
-    throw new DatabaseException("sqlite error: " ~ msg ~ ": " ~ to!string(err)); // need to send err
-}
+       auto as(T:string)() {
+       import core.stdc.string: strlen;
+       auto ptr = cast(immutable char*) sqlite3_column_text(result_.st_, cast(int) idx_);
+       return cast(string) ptr[0..strlen(ptr)]; // fix with length
+       }
 
-void throw_error()(string label) {
-    throw new DatabaseException(label);
-}
+       auto chars() {
+       import core.stdc.string: strlen;
+       auto data = sqlite3_column_text(result_.st_, cast(int) idx_);
+       return data ? data[0 .. strlen(data)] : data[0..0];
+       }
 
-void throw_error()(string label, char *msg) {
-    // frees up pass char * as required by sqlite
-    import core.stdc.string : strlen;
-    char[] m;
-    sizediff_t sz = strlen(msg);
-    m.length = sz;
-    for(int i = 0; i != sz; i++) m[i] = msg[i];
-    sqlite3_free(msg);
-    throw new DatabaseException(label ~ m.idup);
-}
+    // char*, string_ref?
 
-/*
-
-   auto as(T:string)() {
-   import core.stdc.string: strlen;
-   auto ptr = cast(immutable char*) sqlite3_column_text(result_.st_, cast(int) idx_);
-   return cast(string) ptr[0..strlen(ptr)]; // fix with length
-   }
-
-   auto chars() {
-   import core.stdc.string: strlen;
-   auto data = sqlite3_column_text(result_.st_, cast(int) idx_);
-   return data ? data[0 .. strlen(data)] : data[0..0];
-   }
-
-// char*, string_ref?
-
-const(char*) toStringz() {
+    const(char*) toStringz() {
 // this may not work either because it's not around for the whole row
 return sqlite3_column_text(result_.st_, cast(int) idx_);
 }
 
- */
+     */
 
 extern(C) int sqlite_callback(void* cb, int howmany, char** text, char** columns) {
     return 0;
+}
+
 }

@@ -1,12 +1,21 @@
 module std.database.test;
 import std.stdio;
 import std.database.uri;
+import std.experimental.logger;
 
 unittest {
     URI uri = toURI("protocol://host");
     assert(uri.protocol == "protocol");
     assert(uri.host == "host");
+    log(uri.path);
     assert(uri.path == "");
+}
+
+unittest {
+    URI uri = toURI("protocol://host:1234/");
+    assert(uri.protocol == "protocol");
+    assert(uri.host == "host");
+    assert(uri.port == 1234);
 }
 
 unittest {

@@ -2,6 +2,7 @@ module std.database.resolver;
 
 import std.database.exception;
 import std.database.uri;
+import std.database.source;
 
 import std.process;
 import std.file;
@@ -11,14 +12,6 @@ import std.conv;
 import std.stdio;
 import std.string;
 
-struct Source {
-    string type;
-    string server;
-    string path; // for file references (sqlite)
-    string database;
-    string username;
-    string password;
-}
 
 Source resolve(string name) {
     if (name.length == 0) throw new DatabaseException("resolver: name empty");
@@ -29,7 +22,12 @@ Source resolve(string name) {
     if (name.indexOf('/') != -1) {
         URI uri = toURI(name);
         source.type = uri.protocol; 
-        source.server = uri.host;
+        if (uri.port != 0) {
+            source.host = uri.host;
+            source.port = uri.port;
+        } else {
+            source.server = uri.host;
+        }
         source.path = uri.path.startsWith('/') ? uri.path[1..$] : uri.path;
         source.database = source.path; 
         source.username = uri["username"];

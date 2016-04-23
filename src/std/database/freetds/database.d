@@ -3,7 +3,7 @@ pragma(lib, "sybdb");
 
 import std.database.common;
 import std.database.exception;
-import std.database.resolver;
+import std.database.source;
 
 import std.database.freetds.bindings;
 
@@ -21,19 +21,15 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl.Database!T);
-alias Connection(T) = BasicConnection!(Impl.Connection!T);
-alias Statement(T) = BasicStatement!(Impl.Statement!T);
-alias Result(T) = BasicResult!(Impl.Result!T);
-alias ResultRange(T) = BasicResultRange!(Impl.Result!T);
-alias Row(T) = BasicRow!(Impl.Result!T);
-alias Value(T) = BasicValue!(Impl.Result!T);
+alias Database(T) = BasicDatabase!(Impl!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-struct Impl {
+
+struct Impl(Policy) {
+    alias Allocator = Policy.Allocator;
 
     private static bool isError(RETCODE ret) {
         return 
@@ -55,9 +51,7 @@ struct Impl {
         return ret;
     }
 
-    struct Database(T) {
-        alias Allocator = T.Allocator;
-        alias Connection = Impl.Connection!T;
+    struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
         bool bindable() {return false;}
@@ -118,37 +112,41 @@ struct Impl {
 
     }
 
-    struct Connection(T) {
-        alias Allocator = T.Allocator;
-        alias Database = Impl.Database!T;
-        alias Statement = Impl.Statement!T;
-
+    struct Connection {
         Database* db;
-        string source;
+        Source source;
         LOGINREC *login;
         DBPROCESS *con;
 
         DatabaseError error;
 
-        this(Database* db_, string source_) {
+        this(Database* db_, Source source_) {
             db = db_;
             source = source_;
 
-            info("Connection: ", source);
-
-            Source src = resolve(source);
+            info("Connection: ");
 
             login = check("dblogin", dblogin());
 
-            check("dbsetlname", dbsetlname(login, toStringz(src.username), DBSETUSER));
-            check("dbsetlname", dbsetlname(login, toStringz(src.password), DBSETPWD));
+            check("dbsetlname", dbsetlname(login, toStringz(source.username), DBSETUSER));
+            check("dbsetlname", dbsetlname(login, toStringz(source.password), DBSETPWD));
 
-            //con = dbopen(login, toStringz(src.server));
-            con = check("tdsdbopen", tdsdbopen(login, toStringz(src.server), 1));
+            // if host is present, then specify server as direct host:port
+            // otherwise just past a name for freetds name lookup
+
+            string server;
+            if (source.host.length != 0) {
+                server = source.host ~ ":" ~ to!string(source.port);
+            } else {
+                server = source.server;
+            }
+
+            //con = dbopen(login, toStringz(source.server));
+            con = check("tdsdbopen: " ~ server, tdsdbopen(login, toStringz(server), 1));
 
             dbsetuserdata(con, cast(BYTE*) &this);
 
-            check("dbuse", dbuse(con, toStringz(src.database)));
+            check("dbuse", dbuse(con, toStringz(source.database)));
         }
 
         ~this() {
@@ -159,12 +157,7 @@ struct Impl {
 
     }
 
-    struct Statement(T) {
-        alias Connection = Impl.Connection!T;
-        //alias Bind = Impl.Bind!T;
-        alias Result = Impl.Result!T;
-        alias Allocator = T.Allocator;
-
+    struct Statement {
         Connection* con;
         string sql;
         Allocator *allocator;
@@ -213,7 +206,7 @@ struct Impl {
         }
     }
 
-    struct Describe(T) {
+    struct Describe {
         char *name;
         char *buffer;
         int type;
@@ -221,7 +214,7 @@ struct Impl {
         int status;
     }
 
-    struct Bind(T) {
+    struct Bind {
         ValueType type;
         int bindType;
         int size;
@@ -229,12 +222,7 @@ struct Impl {
         DBINT status;
     }
 
-    struct Result(T) {
-        alias Allocator = T.Allocator;
-        alias Statement = Impl.Statement!T;
-        alias Describe = Impl.Describe!T;
-        alias Bind = Impl.Bind!T;
-
+    struct Result {
         //int columns() {return columns;}
 
         Statement* stmt;

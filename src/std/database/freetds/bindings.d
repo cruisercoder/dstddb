@@ -90,8 +90,11 @@ extern(System) {
     EHANDLEFUNC dberrhandle(EHANDLEFUNC handler);
     MHANDLEFUNC dbmsghandle(MHANDLEFUNC handler);
 
-    struct LOGINREC;
-    alias tds_dblib_loginrec = LOGINREC;
+    struct TDSLOGIN;
+
+    struct LOGINREC {
+        TDSLOGIN *tds_login;
+    };
 
     LOGINREC *dblogin();
     void dbloginfree(LOGINREC * login);
@@ -124,6 +127,23 @@ extern(System) {
     RETCODE dbnullbind(DBPROCESS * dbproc, int column, DBINT * indicator);
 
     STATUS dbnextrow(DBPROCESS * dbproc);
+
+    // tds functions (from tds.h), not accessible from dblib :)
+    alias ubyte TDS_TINYINT;
+
+    void tds_set_packet(TDSLOGIN * tds_login, int packet_size);
+    void tds_set_port(TDSLOGIN * tds_login, int port);
+    bool tds_set_passwd(TDSLOGIN * tds_login, const char *password);
+    void tds_set_bulk(TDSLOGIN * tds_login, TDS_TINYINT enabled);
+    bool tds_set_user(TDSLOGIN * tds_login, const char *username);
+    bool tds_set_app(TDSLOGIN * tds_login, const char *application);
+    bool tds_set_host(TDSLOGIN * tds_login, const char *hostname);
+    bool tds_set_library(TDSLOGIN * tds_login, const char *library);
+    bool tds_set_server(TDSLOGIN * tds_login, const char *server);
+    bool tds_set_client_charset(TDSLOGIN * tds_login, const char *charset);
+    bool tds_set_language(TDSLOGIN * tds_login, const char *language);
+    void tds_set_version(TDSLOGIN * tds_login, TDS_TINYINT major_ver, TDS_TINYINT minor_ver);
+    //int tds_connect_and_login(TDSSOCKET * tds, TDSLOGIN * login);
 
 }
 

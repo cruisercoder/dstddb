@@ -3,9 +3,11 @@ module std.database.uri;
 import std.stdio;
 import std.traits;
 import std.string;
+import std.experimental.logger;
 
 struct URI {
     string protocol,host,path,qs;
+    int port;
     string[][string] query;
 
     string opIndex(string name) const {
@@ -15,7 +17,11 @@ struct URI {
 }
 
 URI toURI(string str) {
-    // example: protocol://host/path?a=1&b=2
+    import std.conv;
+
+    // examples:
+    // protocol://server/path?a=1&b=2
+    // protocol://host:port/path?a=1&b=2
 
     void error(string msg) {throw new Exception(msg ~ ", URI: " ~ str);}
 
@@ -30,10 +36,23 @@ URI toURI(string str) {
 
     auto q = s.indexOf('?');
     i = s.indexOf('/');
-    uri.host = s[0 .. (i==-1 ? s.length : i)];
-    if (i != -1) uri.path = s[i .. (q==-1 ? s.length : q)];
+    auto host = s[0 .. (i==-1 ? s.length : i)];
+    if (i != -1) {
+        uri.path = s[i .. (q==-1 ? s.length : q)];
+    }
+
+    auto colon = host.indexOf(':');
+    if (colon != -1) {
+        uri.host = host[0 .. colon];
+        uri.port = to!int(host[colon+1 .. host.length]);
+    } else {
+        uri.host = host;
+    }
 
     if (q == -1) return uri;
+
+
+
     uri.qs = s[q+1..$];
 
     foreach (e; split(uri.qs, "&")) {
