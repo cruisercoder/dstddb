@@ -1,4 +1,4 @@
-module std.database.postgres.test;
+module std.database.vibe.test;
 import std.database.util;
 import std.database.common;
 import std.database.postgres;

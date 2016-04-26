@@ -1,4 +1,4 @@
-module std.database.mysql.test;
+module std.database.webscalesql.test;
 import std.database.util;
 import std.database.mysql;
 import std.experimental.logger;
