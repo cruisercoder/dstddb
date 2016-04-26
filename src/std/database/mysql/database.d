@@ -46,9 +46,9 @@ auto createDatabase(T)(string defaultURI="") {
 
 private static bool isError()(int ret) {
     return 
-        ret != 0 &&
-        ret != MYSQL_NO_DATA &&
-        ret != MYSQL_DATA_TRUNCATED;
+        !(ret == 0 ||
+        ret == MYSQL_NO_DATA ||
+        ret == MYSQL_DATA_TRUNCATED);
 }
 
 private static T* check(T)(string msg, T* ptr) {
