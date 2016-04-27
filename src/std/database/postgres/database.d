@@ -12,7 +12,7 @@ import std.database.source;
 import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
-import std.database.impl;
+import std.database.front;
 
 import std.stdio;
 import std.typecons;
@@ -23,7 +23,7 @@ struct DefaultPolicy {
     static const bool nonblocking = false;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -64,7 +64,7 @@ int checkForZero()(PGconn *con, string msg, int result) {
     return result;
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
 
     struct Database {

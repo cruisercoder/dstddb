@@ -10,6 +10,16 @@ unittest {
     import std.database.testsuite;
     alias DB = Database!DefaultPolicy;
     testAll!DB("mysql");
+
+    //negativeNotExecuteTest();
+
+}
+
+void negativeNotExecuteTest() {
+    auto db = createDatabase("mysql://127.0.0.1/test");
+    auto con = db.connection();
+    //con.statement("select * from score").writeResult();
+    con.statement("select * from score").writeResult();
 }
 
 unittest {

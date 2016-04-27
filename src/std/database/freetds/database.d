@@ -14,21 +14,21 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
 
     private static bool isError(RETCODE ret) {
@@ -124,7 +124,7 @@ struct Impl(Policy) {
             db = db_;
             source = source_;
 
-            info("Connection: ");
+            //info("Connection: ");
 
             login = check("dblogin", dblogin());
 
@@ -150,7 +150,7 @@ struct Impl(Policy) {
         }
 
         ~this() {
-            info("~Connection: ", source);
+            //info("~Connection: ", source);
             if (con) dbclose(con);
             if (login) dbloginfree(login);
         }
@@ -292,6 +292,12 @@ struct Impl(Policy) {
                         allocSize = b.size+1;
                         b.bindType = NTBSTRINGBIND;
                         break;
+                    case SYBMSDATE:
+                        b.type = ValueType.Date;
+                        b.size = DBDATETIME.sizeof;
+                        allocSize = b.size;
+                        b.bindType = DATETIMEBIND;
+                        break;
                     default: 
                         b.type = ValueType.String;
                         b.size = 255;
@@ -348,7 +354,10 @@ struct Impl(Policy) {
         }
 
         auto get(X:Date)(Bind *b) {
-            return Date(2016,1,1); // fix
+            auto ptr = cast(DBDATETIME*) b.data.ptr;
+            DBDATEREC d;
+            check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
+            return Date(d.year, d.month, d.day);
         }
 
         void checkType(int a, int b) {

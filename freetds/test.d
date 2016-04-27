@@ -11,8 +11,21 @@ unittest {
     alias DB = Database!DefaultPolicy;
     testAll!DB("freetds");
 
+    dateTest();
     //example();
     //backTest();
+}
+
+void dateTest() {
+    import std.database.freetds;
+    import std.datetime;
+    auto db = createDatabase("freetds");
+    auto con = db.connection();
+    con.query("drop table d1");
+    con.query("create table d1(a date)");
+    con.query("insert into d1 values ('2016-01-15')");
+    auto rs = con.query("select * from d1");
+    writeResult(rs[]);
 }
 
 void example() {

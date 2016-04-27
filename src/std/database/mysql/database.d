@@ -20,28 +20,28 @@ version(Windows) {
 import std.database.mysql.bindings;
 import std.database.exception;
 import std.database.allocator;
-import std.database.impl;
+import std.database.front;
 import std.container.array;
 import std.experimental.logger;
 import std.string;
 
 // alias Database(T) = std.database.impl.Database!(T,DatabaseImpl!T); 
 
-alias Database(T) = BasicDatabase!(Impl!T.Sync,T);
+alias Database(T) = BasicDatabase!(Driver!T.Sync,T);
 
-alias AsyncDatabase(T) = BasicDatabase!(Impl!T.Async,T);
+alias AsyncDatabase(T) = BasicDatabase!(Driver!T.Async,T);
 
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-auto createDatabase()(string defaultURI="") {
-    return Database!DefaultPolicy(defaultURI);  
+auto createDatabase()(string uri="") {
+    return Database!DefaultPolicy(uri);  
 }
 
-auto createDatabase(T)(string defaultURI="") {
-    return Database!T(defaultURI);  
+auto createDatabase(T)(string uri="") {
+    return Database!T(uri);  
 }
 
 private static bool isError()(int ret) {
@@ -77,7 +77,7 @@ private static void createError()(string msg, MYSQL_STMT* stmt, int ret) {
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
-struct Impl(Policy) {
+private struct Driver(Policy) {
 
     struct Describe {
         int index;
@@ -100,15 +100,15 @@ struct Impl(Policy) {
         alias Allocator = Policy.Allocator;
         alias const(ubyte)* cstring;
 
-        alias Describe = Impl!Policy.Describe;
-        alias Bind = Impl!Policy.Bind;
+        alias Describe = Driver!Policy.Describe;
+        alias Bind = Driver!Policy.Bind;
 
         struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;
 
             Allocator allocator;
 
-            this(string defaultURI) {
+            this(string uri) {
                 allocator = Allocator();
                 info("mysql client info: ", to!string(mysql_get_client_info()));
             }
@@ -423,8 +423,8 @@ struct Impl(Policy) {
 
     struct Async {
         alias Allocator = Policy.Allocator;
-        alias Describe = Impl!Policy.Describe;
-        alias Bind = Impl!Policy.Bind;
+        alias Describe = Driver!Policy.Describe;
+        alias Bind = Driver!Policy.Bind;
 
         struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;

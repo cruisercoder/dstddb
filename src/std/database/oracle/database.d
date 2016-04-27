@@ -16,13 +16,13 @@ import std.experimental.logger;
 
 import std.datetime;
 
-import std.database.impl;
+import std.database.front;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -42,8 +42,52 @@ void check()(string msg, sword status) {
 //static auto create()(string uri="") {return Database!DefaultPolicy();}
 //}
 
-struct Impl(Policy) {
+
+
+
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+
+    // experimental
+    struct BindContext {
+        this(Describe* d, Bind* b) {describe = d; bind = b;}
+        const Describe* describe;
+        Bind* bind;
+
+    }
+    static void binder(ref BindContext ctx) {}
+
+    static void strBind(ref BindContext ctx) { //fix fixed length
+        ctx.bind.type = ValueType.String;
+        ctx.bind.oType = SQLT_STR;
+        //ctx.bind.allocSize = cast(sb4) (ctx.describe.size + 1);
+        ctx.bind.allocSize = 1024;
+        ctx.bind.data = cast(void*)(allocator.allocate(b.allocSize));
+        emplace(cast(OCIDate*) ctx.bind.data);
+
+        // include byte for null terminator
+        //d.buf_size = d.size ? d.size+1 : 1024*10; // FIX
+
+        /*
+           d.buf = new char[d.buf_size * ctx.row_array_size];
+           d.valuep = d.buf;
+           d.ind = new sb2[ctx.row_array_size];
+           d.length = new ub2[ctx.row_array_size];
+           d.unbind = oracle_str_unbind;
+         */
+    }
+
+    struct BindInfo {
+        ub2 colType;
+        ub2 bindType;
+        void function(ref BindContext ctx) bind;
+        static const BindInfo[3] info = [
+        {SQLT_INT,SQLT_INT,&binder},
+        {SQLT_NUM,SQLT_STR,&binder},
+        {SQLT_CHR,SQLT_STR,&binder}
+        ];
+    }
+
 
     struct Database {
         alias queryVariableType = QueryVariableType.Dollar;
@@ -392,6 +436,8 @@ struct Impl(Policy) {
                     b.data = cast(void*)(allocator.allocate(b.allocSize));
                     emplace(cast(OCIDate*) b.data);
                 } else {
+                    //auto ctx = BindContext(d,b);
+                    //strBind(ctx);
                     b.type = ValueType.String;
                     b.oType = SQLT_STR;
                     b.allocSize = cast(sb4) (d.size + 1);

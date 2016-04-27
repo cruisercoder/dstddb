@@ -1,5 +1,5 @@
 module std.database.rowset;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 import std.container.array;
 
@@ -25,12 +25,12 @@ struct RowSet {
         void *data;
     }
 
-    struct Impl {
+    struct Driver {
         alias Result = .RowSet;
         alias Bind = RowSet.Bind;
     }
 
-    alias Converter = .Converter!Impl;
+    alias Converter = .Converter!Driver;
 
 
     struct TypeInfo(T:int) {static int type() {return ValueType.Int;}}

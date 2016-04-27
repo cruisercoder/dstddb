@@ -16,7 +16,7 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 
 //alias long SQLLEN;
@@ -29,13 +29,13 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
 
     struct Database {

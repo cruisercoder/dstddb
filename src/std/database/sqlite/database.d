@@ -13,7 +13,7 @@ import std.database.source;
 import std.database.allocator;
 import std.database.pool;
 import std.experimental.logger;
-import std.database.impl;
+import std.database.front;
 
 import std.container.array;
 import std.datetime;
@@ -24,7 +24,7 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -34,7 +34,7 @@ auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
 
     struct Database {

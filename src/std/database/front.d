@@ -1,4 +1,4 @@
-module std.database.impl;
+module std.database.front;
 import std.experimental.logger;
 import std.database.exception;
 import std.datetime;
@@ -31,13 +31,13 @@ enum ValueType {
     Date,
 }
 
-struct BasicDatabase(I,P) {
-    alias Impl = I;
+struct BasicDatabase(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias Database = Impl.Database;
+    alias Database = Driver.Database;
     alias Allocator = Policy.Allocator;
-    alias Connection = BasicConnection!(Impl,Policy);
-    alias Pool = .Pool!(Impl.Connection);
+    alias Connection = BasicConnection!(Driver,Policy);
+    alias Pool = .Pool!(Driver.Connection);
     alias ScopedResource = .ScopedResource!Pool;
 
     alias queryVariableType = Database.queryVariableType;
@@ -51,17 +51,19 @@ struct BasicDatabase(I,P) {
     auto query(string sql) {return connection().query(sql);}
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
-    bool bindable() {return data_.impl.bindable();}
-    bool dateBinding() {return data_.impl.dateBinding();}
+    bool bindable() {return data_.database.bindable();}
+    bool dateBinding() {return data_.database.dateBinding();}
+
+    auto ref driverDatabase() {return data_.database;}
 
     private struct Payload {
         string defaultURI;
-        Database impl;
+        Database database;
         Pool pool;
         this(string defaultURI_) {
             defaultURI = defaultURI_;
-            impl = Database(defaultURI_);
-            pool = Pool(impl.poolEnable());
+            database = Database(defaultURI_);
+            pool = Pool(database.poolEnable());
         }
     }
 
@@ -75,15 +77,15 @@ struct BasicDatabase(I,P) {
 }
 
 
-struct BasicConnection(I,P) {
-    alias Impl = I;
+struct BasicConnection(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias ConnectionImpl = Impl.Connection;
-    alias Statement = BasicStatement!(Impl,Policy);
-    alias Database = BasicDatabase!(Impl,Policy);
+    alias DriverConnection = Driver.Connection;
+    alias Statement = BasicStatement!(Driver,Policy);
+    alias Database = BasicDatabase!(Driver,Policy);
     alias Pool = Database.Pool;
     alias ScopedResource = Database.ScopedResource;
-    alias DatabaseImpl = Impl.Database;
+    alias DatabaseImpl = Driver.Database;
 
     auto statement(string sql) {return Statement(this,sql);}
     auto statement(X...) (string sql, X args) {return Statement(this,sql,args);}
@@ -103,19 +105,16 @@ struct BasicConnection(I,P) {
         //db_ = db;
         uri_ = uri.length != 0 ? uri : db.data_.defaultURI;
         pool_ = &db.data_.pool;
-
         Source source = resolve(uri_);
-
-        DatabaseImpl* impl = &db.data_.refCountedPayload().impl;
-        data_ = Data(*pool_, pool_.acquire(impl, source));
+        data_ = Data(*pool_, pool_.acquire(&db.driverDatabase(), source));
     }
 
-    private auto impl() {
+    private auto ref driverConnection() {
         return data_.resource.resource;
     }
 
     static if (hasMember!(Database, "socket")) {
-        auto socket() {return impl.socket;}
+        auto socket() {return driverConnection.socket;}
     }
 
     // handle()
@@ -123,7 +122,7 @@ struct BasicConnection(I,P) {
     // while a handle is in use  (Use a connection variable to extend scope)
 
     static if (hasMember!(Database, "handle")) {
-        auto handle() {return impl.handle;}
+        auto handle() {return driverConnection.handle;}
     }
 
     /*
@@ -136,21 +135,32 @@ data_ = Data(&db.data_.refCountedPayload(),uri);
 
 }
 
-struct BasicStatement(I,P) {
-    alias Impl = I;
+struct BasicStatement(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias StatementImpl = Impl.Statement;
-    alias Connection = BasicConnection!(Impl,Policy);
-    alias Result = BasicResult!(Impl,Policy);
-    //alias Allocator = Impl.Policy.Allocator;
+    alias DriverStatement = Driver.Statement;
+    alias Connection = BasicConnection!(Driver,Policy);
+    alias Result = BasicResult!(Driver,Policy);
+    //alias Allocator = Policy.Allocator;
     alias ScopedResource = Connection.ScopedResource;
 
-    auto result() {return Result(this);}
+    auto result() {
+        if (state != State.Executed) throw new DatabaseException("statement not executed");
+        return Result(this);
+    }
     auto opSlice() {return result();} //fix
+
+    enum State {
+        Undef,
+        Prepared,
+        Executed,
+    }
+    
+    State state;
 
     this(Connection con, string sql) {
         con_ = con;
-        data_ = Data(con_.impl,sql);
+        data_ = Data(con_.driverConnection,sql);
         prepare();
     }
 
@@ -172,11 +182,13 @@ struct BasicStatement(I,P) {
 
     auto query() {
         data_.query();
+        state = State.Executed;
         return Result(this);
     }
 
     auto query(X...) (X args) {
         data_.query(args);
+        state = State.Executed;
         return Result(this);
     }
 
@@ -192,27 +204,28 @@ struct BasicStatement(I,P) {
 
 
     private:
-    alias RefCounted!(StatementImpl, RefCountedAutoInitialize.no) Data;
+    alias RefCounted!(DriverStatement, RefCountedAutoInitialize.no) Data;
 
     Data data_;
     Connection con_;
 
     void prepare() {
         data_.prepare();
+        state = State.Prepared;
     }
 
     void reset() {data_.reset();} //SQLCloseCursor
 }
 
 
-struct BasicResult(I,P) {
-    alias Impl = I;
+struct BasicResult(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias ResultImpl = Impl.Result;
-    alias Statement = BasicStatement!(Impl,Policy);
-    alias ResultRange = BasicResultRange!(Impl,Policy);
-    //alias Allocator = Impl.Policy.Allocator;
-    alias Bind = Impl.Bind;
+    alias ResultImpl = Driver.Result;
+    alias Statement = BasicStatement!(Driver,Policy);
+    alias ResultRange = BasicResultRange!(Driver,Policy);
+    //alias Allocator = Driver.Policy.Allocator;
+    alias Bind = Driver.Bind;
     //alias Row = .Row;
 
     int columns() {return data_.columns;}
@@ -235,11 +248,11 @@ package:
     Data data_;
 }
 
-struct BasicResultRange(I,P) {
-    alias Impl = I;
+struct BasicResultRange(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Impl,Policy);
-    alias Row = BasicRow!(Impl,Policy);
+    alias Result = BasicResult!(Driver,Policy);
+    alias Row = BasicRow!(Driver,Policy);
 
     private Result result_;
     private bool ok_;
@@ -254,11 +267,11 @@ struct BasicResultRange(I,P) {
     void popFront() {ok_ = result_.next();}
 }
 
-struct BasicRow(I,P) {
-    alias Impl = I;
+struct BasicRow(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Impl,Policy);
-    alias Value = BasicValue!(Impl,Policy);
+    alias Result = BasicResult!(Driver,Policy);
+    alias Value = BasicValue!(Driver,Policy);
 
     this(Result* result) {
         result_ = result;
@@ -272,14 +285,14 @@ struct BasicRow(I,P) {
     private Result* result_;
 }
 
-struct BasicValue(I,P) {
-    alias Impl = I;
+struct BasicValue(D,P) {
+    alias Driver = D;
     alias Policy = P;
-    alias Result = Impl.Result;
-    alias Bind = Impl.Bind;
+    alias Result = Driver.Result;
+    alias Bind = Driver.Bind;
     private Result* result_;
     private Bind* bind_;
-    alias Converter = .Converter!Impl;
+    alias Converter = .Converter!Driver;
 
     this(Result* result, Bind* bind) {
         result_ = result;
@@ -306,10 +319,10 @@ struct BasicValue(I,P) {
 
 
 struct EfficientValue(T) {
-    alias Impl = T.Impl;
-    alias Bind = Impl.Bind;
+    alias Driver = T.Driver;
+    alias Bind = Driver.Bind;
     private Bind* bind_;
-    alias Converter = .Converter!Impl;
+    alias Converter = .Converter!Driver;
 
     this(Bind* bind) {bind_ = bind;}
 
@@ -326,8 +339,9 @@ struct TypeInfo(T:Date) {static auto type() {return ValueType.Date;}}
 
 
 struct Converter(T) {
-    alias Result = T.Result;
-    alias Bind = T.Bind;
+    alias Driver = T;
+    alias Result = Driver.Result;
+    alias Bind = Driver.Bind;
 
     static Y convert(Y)(Result *r, Bind *b) {
         ValueType x = b.type, y = TypeInfo!Y.type;
