@@ -53,7 +53,7 @@ private static bool isError()(int ret) {
 
 private static T* check(T)(string msg, T* ptr) {
     info(msg);
-    if (!ptr) throw new DatabaseException("mysql error: " ~ msg);
+    if (!ptr) createError(msg);
     return ptr;
 }
 
@@ -63,12 +63,17 @@ private static int check()(string msg, MYSQL_STMT* stmt, int ret) {
     return ret;
 }
 
+private static void createError()(string msg) {
+    throw new DatabaseException("mysql error: " ~ msg);
+}
+
+private static void createError()(string msg, int ret) {
+    throw new DatabaseException("mysql error: status: " ~ to!string(ret) ~ ":" ~ msg);
+}
+
 private static void createError()(string msg, MYSQL_STMT* stmt, int ret) {
-    info(msg, ":", ret);
-    if (!isError(ret)) return;
     import core.stdc.string: strlen;
     const(char*) err = mysql_stmt_error(stmt);
-    //info("error: ", err[0..strlen(err)]); //fix
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
@@ -368,10 +373,10 @@ struct Impl(Policy) {
                 //rows_ = row_count_;
                 return false;
             } else if (status == MYSQL_DATA_TRUNCATED) {
-                throw new DatabaseException("fetch: database truncation");
+                createError("mysql_stmt_fetch: truncation", status);
             }
 
-            createError("mysql_stmt_fetch",stmt.stmt,status);
+            createError("mysql_stmt_fetch", stmt.stmt, status);
             return false;
         }
 
