@@ -22,8 +22,6 @@ import std.traits;
    (version_major == 2 && version_minor == 70));
  */
 
-// Place for basic DB type templates (need forward bug fixed first)
-// and other implementation related stuff
 
 enum ValueType {
     Int,
@@ -31,12 +29,22 @@ enum ValueType {
     Date,
 }
 
+enum Feature {
+    InputBinding,
+    DateBinding,
+    ConnectionPool,
+    OutputArrayBinding,
+}
+
+alias FeatureArray = Feature[];
+
 struct BasicDatabase(D,P) {
     alias Driver = D;
     alias Policy = P;
     alias Database = Driver.Database;
     alias Allocator = Policy.Allocator;
     alias Connection = BasicConnection!(Driver,Policy);
+    alias Cell = BasicCell!(Driver,Policy);
     alias Pool = .Pool!(Driver.Connection);
     alias ScopedResource = .ScopedResource!Pool;
 
@@ -51,8 +59,12 @@ struct BasicDatabase(D,P) {
     auto query(string sql) {return connection().query(sql);}
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
-    bool bindable() {return data_.database.bindable();}
-    bool dateBinding() {return data_.database.dateBinding();}
+    static bool hasFeature(Feature feature) {
+        import std.algorithm;
+        import std.range.primitives: empty;
+        auto r = find(Database.features, feature);
+        return !r.empty;
+    }
 
     auto ref driverDatabase() {return data_.database;}
 
@@ -60,10 +72,11 @@ struct BasicDatabase(D,P) {
         string defaultURI;
         Database database;
         Pool pool;
+        bool poolEnable = hasFeature(Feature.ConnectionPool);
         this(string defaultURI_) {
             defaultURI = defaultURI_;
             database = Database(defaultURI_);
-            pool = Pool(database.poolEnable());
+            pool = Pool(poolEnable);
         }
     }
 
@@ -92,12 +105,18 @@ struct BasicConnection(D,P) {
     auto query(string sql) {return statement(sql).query();}
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
+    auto rowArraySize(int rows) {
+        rowArraySize_ = rows;
+        return this;
+    }
+
     private alias RefCounted!(ScopedResource, RefCountedAutoInitialize.no) Data;
 
     //private Database db_; // problem (fix in 2.072)
     private Data data_;
     private Pool* pool_;
     string uri_;
+    int rowArraySize_ = 1;
 
     package this(Database db) {this(db,"");}
 
@@ -155,12 +174,12 @@ struct BasicStatement(D,P) {
         Prepared,
         Executed,
     }
-    
-    State state;
+
 
     this(Connection con, string sql) {
         con_ = con;
         data_ = Data(con_.driverConnection,sql);
+        rowArraySize_ = con.rowArraySize_;
         prepare();
     }
 
@@ -183,13 +202,13 @@ struct BasicStatement(D,P) {
     auto query() {
         data_.query();
         state = State.Executed;
-        return Result(this);
+        return Result(this, rowArraySize_);
     }
 
     auto query(X...) (X args) {
         data_.query(args);
         state = State.Executed;
-        return Result(this);
+        return Result(this, rowArraySize_);
     }
 
     // experimental async
@@ -208,6 +227,8 @@ struct BasicStatement(D,P) {
 
     Data data_;
     Connection con_;
+    State state;
+    int rowArraySize_;
 
     void prepare() {
         data_.prepare();
@@ -230,19 +251,35 @@ struct BasicResult(D,P) {
 
     int columns() {return data_.columns;}
 
-    this(Statement stmt) {
+    this(Statement stmt, int rowArraySize = 1) {
         stmt_ = stmt;
-        data_ = Data(&stmt.data_.refCountedPayload());
+        rowArraySize_ = rowArraySize;
+        data_ = Data(&stmt.data_.refCountedPayload(), rowArraySize_);
+        if (!data_.hasResult()) return;
+        rowsFetched_ = data_.fetch();
     }
 
     auto opSlice() {return ResultRange(this);}
 
 package:
-    bool start() {return data_.start();}
-    bool next() {return data_.next();}
+    int rowsFetched() {return rowsFetched_;}
+
+    bool next() {
+        if (++rowIdx_ == rowsFetched_) {
+            rowsFetched_ = data_.fetch();
+            if (!rowsFetched_) return false;
+            rowIdx_ = 0;
+        }
+        return true;
+    }
+
+    auto ref result() {return data_.refCountedPayload();}
 
     private:
     Statement stmt_;
+    int rowArraySize_; //maybe move into RC
+    int rowIdx_;
+    int rowsFetched_;
 
     alias RefCounted!(ResultImpl, RefCountedAutoInitialize.no) Data;
     Data data_;
@@ -259,7 +296,7 @@ struct BasicResultRange(D,P) {
 
     this(Result result) {
         result_ = result;
-        ok_ = result_.start();
+        ok_ = result.rowsFetched != 0;
     }
 
     bool empty() {return !ok_;}
@@ -271,6 +308,7 @@ struct BasicRow(D,P) {
     alias Driver = D;
     alias Policy = P;
     alias Result = BasicResult!(Driver,Policy);
+    alias Cell = BasicCell!(Driver,Policy);
     alias Value = BasicValue!(Driver,Policy);
 
     this(Result* result) {
@@ -278,30 +316,45 @@ struct BasicRow(D,P) {
     }
 
     int columns() {return result_.columns();}
-    Value opIndex(size_t idx) {return Value(
-            &result_.data_.refCountedPayload(),
-            &result_.data_.bind[idx]);} // needs work
+
+    Value opIndex(size_t idx) {
+        // needs work
+        auto cell = Cell(result_, &result_.data_.bind[idx]);
+        return Value(
+                result_,
+                cell);
+                //&result_.data_.bind[idx]);
+    }
 
     private Result* result_;
 }
 
+
 struct BasicValue(D,P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = Driver.Result;
+    //alias Result = Driver.Result;
+    alias Result = BasicResult!(Driver,Policy);
+    alias Cell = BasicCell!(Driver,Policy);
     alias Bind = Driver.Bind;
     private Result* result_;
     private Bind* bind_;
-    alias Converter = .Converter!Driver;
+    private Cell cell_;
+    alias Converter = .Converter!(Driver,Policy);
 
-    this(Result* result, Bind* bind) {
+    this(Result* result, Cell cell) {
         result_ = result;
-        bind_ = bind;
+        //bind_ = bind;
+        cell_ = cell;
     }
 
-    auto as(T:int)() {return Converter.convert!T(result_, bind_);}
-    auto as(T:string)() {return Converter.convert!T(result_, bind_);}
-    auto as(T:Date)() {return Converter.convert!T(result_, bind_);}
+    private auto resultPtr() {
+        return &result_.result();
+    }
+
+    auto as(T:int)() {return Converter.convert!T(resultPtr, cell_);}
+    auto as(T:string)() {return Converter.convert!T(resultPtr, cell_);}
+    auto as(T:Date)() {return Converter.convert!T(resultPtr, cell_);}
 
     /*
     //inout(char)[]
@@ -338,24 +391,43 @@ struct TypeInfo(T:string) {static auto type() {return ValueType.String;}}
 struct TypeInfo(T:Date) {static auto type() {return ValueType.Date;}}
 
 
-struct Converter(T) {
-    alias Driver = T;
+struct BasicCell(D,P) {
+    alias Driver = D;
+    alias Policy = P;
+    alias Result = BasicResult!(Driver,Policy);
+    alias Bind = Driver.Bind;
+    private Bind* bind_;
+    private int rowIdx_;
+
+    this(Result *r, Bind *b) {
+        bind_ = b;
+        rowIdx_ = r.rowIdx_;
+    }
+
+    auto bind() {return bind_;}
+    auto rowIdx() {return rowIdx_;}
+}
+
+struct Converter(D,P) {
+    alias Driver = D;
+    alias Policy = P;
     alias Result = Driver.Result;
     alias Bind = Driver.Bind;
+    alias Cell = BasicCell!(Driver,Policy);
 
-    static Y convert(Y)(Result *r, Bind *b) {
-        ValueType x = b.type, y = TypeInfo!Y.type;
-        if (x == y) return r.get!Y(b); // temporary
+    static Y convert(Y)(Result *r, ref Cell cell) {
+        ValueType x = cell.bind.type, y = TypeInfo!Y.type;
+        if (x == y) return r.get!Y(&cell); // temporary
         auto e = lookup(x,y);
         if (!e) conversionError(x,y);
         Y value;
-        e.convert(r, b, &value);
+        e.convert(r, &cell, &value);
         return value;
     }
 
-    static Y convertDirect(Y)(Result *r, Bind *b) {
+    static Y convertDirect(Y)(Result *r, ref Cell cell) {
         assert(b.type == TypeInfo!Y.type);
-        return r.get!Y(b);
+        return r.get!Y(&cell);
     }
 
     private:
@@ -383,8 +455,8 @@ struct Converter(T) {
     struct generate(X,Y) {
         static void convert(Result *r, void *x_, void *y_) {
             import std.conv;
-            Bind *x = cast(Bind*) x_;
-            *cast(Y*) y_ = to!Y(r.get!X(x));
+            Cell* cell = cast(Cell*) x_;
+            *cast(Y*) y_ = to!Y(r.get!X(cell));
         }
     }
 

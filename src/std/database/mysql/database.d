@@ -98,6 +98,7 @@ private struct Driver(Policy) {
 
     struct Sync {
         alias Allocator = Policy.Allocator;
+        alias Cell = BasicCell!(Sync,Policy);
         alias const(ubyte)* cstring;
 
         alias Describe = Driver!Policy.Describe;
@@ -106,16 +107,18 @@ private struct Driver(Policy) {
         struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;
 
+            static const FeatureArray features = [
+                Feature.InputBinding,
+                Feature.DateBinding,
+                //Feature.ConnectionPool,
+                ];
+
             Allocator allocator;
 
             this(string uri) {
                 allocator = Allocator();
                 info("mysql client info: ", to!string(mysql_get_client_info()));
             }
-
-            bool bindable() {return true;}
-            bool dateBinding() {return true;}
-            bool poolEnable() {return false;}
 
             //~this() {log("~Database");}
         }
@@ -294,7 +297,7 @@ private struct Driver(Policy) {
 
             static const maxData = 256;
 
-            this(Statement* stmt_) {
+            this(Statement* stmt_, int rowArraySize_) {
                 stmt = stmt_;
                 allocator = stmt.allocator;
 
@@ -304,7 +307,6 @@ private struct Driver(Policy) {
 
                 build_describe();
                 build_bind();
-                next();
             }
 
             ~this() {
@@ -366,41 +368,45 @@ private struct Driver(Policy) {
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
 
-            bool start() {return status == 0;}
+            bool hasResult() {return result_metadata != null;}
 
-            bool next() {
+            int fetch() {
                 status = check("mysql_stmt_fetch", stmt.stmt, mysql_stmt_fetch(stmt.stmt));
                 if (!status) {
-                    return true;
+                    return 1;
                 } else if (status == MYSQL_NO_DATA) {
                     //rows_ = row_count_;
-                    return false;
+                    return 0;
                 } else if (status == MYSQL_DATA_TRUNCATED) {
                     createError("mysql_stmt_fetch: truncation", status);
                 }
 
                 createError("mysql_stmt_fetch", stmt.stmt, status);
-                return false;
+                return 0;
             }
 
             // value getters
 
+            /*
             char[] get(X:char[])(Bind *b) {
                 auto ptr = cast(char*) b.data.ptr;
                 return ptr[0..b.length];
             }
+            */
 
-            auto get(X:string)(Bind *b) {
-                return cast(string) get!(char[])(b);
+            auto get(X:string)(Cell* cell) {
+                //return cast(string) get!(char[])(b);
+                auto ptr = cast(char*) cell.bind.data.ptr;
+                return ptr[0..cell.bind.length];
             }
 
-            auto get(X:int)(Bind *b) {
-                return *cast(int*) b.data.ptr;
+            auto get(X:int)(Cell* cell) {
+                return *cast(int*) cell.bind.data.ptr;
             }
 
-            auto get(X:Date)(Bind *b) {
+            auto get(X:Date)(Cell* cell) {
                 //return Date(2016,1,1); // fix
-                MYSQL_TIME *t = cast(MYSQL_TIME*) b.data.ptr;
+                MYSQL_TIME *t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                 //t.year,t.month,t.day,t.hour,t.minute,t.second
                 return Date(t.year,t.month,t.day);
             }
@@ -425,9 +431,16 @@ private struct Driver(Policy) {
         alias Allocator = Policy.Allocator;
         alias Describe = Driver!Policy.Describe;
         alias Bind = Driver!Policy.Bind;
+        alias Cell = BasicCell!(Async,Policy);
 
         struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;
+
+            static const FeatureArray features = [
+                Feature.InputBinding,
+                Feature.DateBinding,
+                //Feature.ConnectionPool,
+                ];
 
             this(string defaultURI) {
                 info("mysql client info: ", to!string(mysql_get_client_info()));
@@ -614,17 +627,16 @@ private struct Driver(Policy) {
 
             static const maxData = 256;
 
-            this(Statement* stmt_) {
+            this(Statement* stmt_, int rowArraySize_) {
                 stmt = stmt_;
                 //allocator = stmt.allocator;
 
                 result_metadata = mysql_stmt_result_metadata(stmt.stmt);
-                if (!result_metadata) return;
+                if (!hasResult) return;
                 //columns = mysql_num_fields(result_metadata);
 
                 build_describe();
                 build_bind();
-                next();
             }
 
             ~this() {
@@ -686,21 +698,21 @@ private struct Driver(Policy) {
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
 
-            bool start() {return status == 0;}
+            bool hasResult() {return result_metadata != null;}
 
-            bool next() {
+            int fetch() {
                 status = check("mysql_stmt_fetch", stmt.stmt, mysql_stmt_fetch(stmt.stmt));
                 if (!status) {
-                    return true;
+                    return 1;
                 } else if (status == MYSQL_NO_DATA) {
                     //rows_ = row_count_;
-                    return false;
+                    return 0;
                 } else if (status == MYSQL_DATA_TRUNCATED) {
                     createError("mysql_stmt_fetch: truncation", status);
                 }
 
                 createError("mysql_stmt_fetch", stmt.stmt, status);
-                return false;
+                return 0;
             }
 
             // value getters
@@ -710,17 +722,19 @@ private struct Driver(Policy) {
                 return ptr[0..b.length];
             }
 
-            auto get(X:string)(Bind *b) {
-                return cast(string) get!(char[])(b);
+            auto get(X:string)(Cell* cell) {
+                //return cast(string) get!(char[])(b);
+                auto ptr = cast(char*) cell.bind.data.ptr;
+                return ptr[0..cell.bind.length];
             }
 
-            auto get(X:int)(Bind *b) {
-                return *cast(int*) b.data.ptr;
+            auto get(X:int)(Cell* cell) {
+                return *cast(int*) cell.bind.data.ptr;
             }
 
-            auto get(X:Date)(Bind *b) {
+            auto get(X:Date)(Cell* cell) {
                 //return Date(2016,1,1); // fix
-                MYSQL_TIME *t = cast(MYSQL_TIME*) b.data.ptr;
+                MYSQL_TIME *t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                 //t.year,t.month,t.day,t.hour,t.minute,t.second
                 return Date(t.year,t.month,t.day);
             }

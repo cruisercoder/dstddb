@@ -43,49 +43,137 @@ void check()(string msg, sword status) {
 //}
 
 
+T attrGet(T)(OCIStmt *stmt, OCIError *error, ub4 attribute) {
+    T value;
+    ub4 sz = T.sizeof;
+    attrGet!T(stmt, error, attribute, value);
+    return value;
+}
+
+void attrGet(T)(OCIStmt *stmt, OCIError *error, ub4 attribute, ref T value) {
+    return attrGet(stmt, OCI_HTYPE_STMT, error, attribute, value);
+}
+
+void attrGet(T)(void* handle, ub4 handleType, OCIError* error, ub4 attribute, ref T value) {
+    ub4 sz = T.sizeof;
+    check("OCIAttrGet", OCIAttrGet(
+                handle,
+                OCI_HTYPE_STMT,
+                &value,
+                &sz,
+                attribute,
+                error));
+}
+
+
 
 
 struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver,Policy);
 
-    // experimental
-    struct BindContext {
-        this(Describe* d, Bind* b) {describe = d; bind = b;}
-        const Describe* describe;
-        Bind* bind;
 
+
+    static void attrSet(T)(OCIStmt *stmt, ub4 attribute, ref T value) {
+        return attrSet(stmt, OCI_HTYPE_STMT, attribute, value);
     }
-    static void binder(ref BindContext ctx) {}
 
-    static void strBind(ref BindContext ctx) { //fix fixed length
-        ctx.bind.type = ValueType.String;
-        ctx.bind.oType = SQLT_STR;
-        //ctx.bind.allocSize = cast(sb4) (ctx.describe.size + 1);
-        ctx.bind.allocSize = 1024;
-        ctx.bind.data = cast(void*)(allocator.allocate(b.allocSize));
-        emplace(cast(OCIDate*) ctx.bind.data);
+    static void attrSet(T)(void* handle, ub4 handleType, ub4 attribute, T value) {
+        ub4 sz = T.sizeof;
+        check("OCIAttrSet", OCIAttrSet(
+                    stmt,
+                    OCI_HTYPE_STMT,
+                    &value,
+                    sz,
+                    attribute,
+                    error));
+    }
+
+    struct BindContext {
+        Describe* describe; // const?
+        Bind* bind;
+        Allocator* allocator;
+        int rowArraySize;
+    }
+
+    static void basicCtor(T) (ref BindContext ctx) {
+        emplace(cast(T*) ctx.bind.data);
+    }
+
+    static void charBinder(ref BindContext ctx) {
+        auto d = ctx.describe, b = ctx.bind;
+        b.type = ValueType.String;
+        b.oType = SQLT_STR;
+        //b.allocSize = cast(sb4) (ctx.describe.size + 1);
+        b.allocSize = 1024; // fix this
 
         // include byte for null terminator
         //d.buf_size = d.size ? d.size+1 : 1024*10; // FIX
+    }
 
-        /*
-           d.buf = new char[d.buf_size * ctx.row_array_size];
-           d.valuep = d.buf;
-           d.ind = new sb2[ctx.row_array_size];
-           d.length = new ub2[ctx.row_array_size];
-           d.unbind = oracle_str_unbind;
-         */
+    static void dateBinder(int type, T)(ref BindContext ctx) {
+        auto d = ctx.describe, b = ctx.bind;
+        b.type = ValueType.Date;
+        b.oType = type;
+        b.allocSize = T.sizeof;
+        b.ctor = &basicCtor!T;
+    }
+
+    struct Conversion {
+        int colType, bindType;
+
+        private static const Conversion[4] info = [
+        {SQLT_INT,SQLT_INT},
+        {SQLT_NUM,SQLT_STR},
+        {SQLT_CHR,SQLT_STR},
+        {SQLT_DAT,SQLT_DAT}
+        ];
+
+        static int get(int colType) {
+            // needs improvement
+            foreach(ref i; info) {
+                if (i.colType == colType) return i.bindType;
+            }
+            throw new DatabaseException(
+                    "unknown conversion for column: " ~ to!string(colType));
+        }
     }
 
     struct BindInfo {
-        ub2 colType;
         ub2 bindType;
-        void function(ref BindContext ctx) bind;
-        static const BindInfo[3] info = [
-        {SQLT_INT,SQLT_INT,&binder},
-        {SQLT_NUM,SQLT_STR,&binder},
-        {SQLT_CHR,SQLT_STR,&binder}
+        void function(ref BindContext ctx) binder;
+
+        static const BindInfo[4] info = [
+        {SQLT_INT,&charBinder},
+        {SQLT_STR,&charBinder},
+        {SQLT_STR,&charBinder},
+        {SQLT_DAT,&dateBinder!(SQLT_ODT,OCIDate)}
         ];
+
+        static void bind(ref BindContext ctx) {
+            import core.memory : GC; // needed?
+            auto d = ctx.describe, b = ctx.bind;
+            auto colType = ctx.describe.oType;
+            auto bindType = Conversion.get(colType);
+            auto allocator = ctx.allocator;
+
+            // needs improvement
+            foreach(ref i; info) {
+                if (i.bindType == bindType) {
+                    i.binder(ctx);
+                    b.data = allocator.allocate(b.allocSize * ctx.rowArraySize);
+                    b.ind = allocator.allocate(sb2.sizeof * ctx.rowArraySize);
+                    b.length = allocator.allocate(ub2.sizeof * ctx.rowArraySize);
+                    if (b.ctor) b.ctor(ctx);
+                    GC.addRange(b.data.ptr, b.data.length);
+                    return;
+                }
+            }
+
+            throw new DatabaseException(
+                    "bind not supported: " ~ to!string(colType));
+        }
+
     }
 
 
@@ -95,6 +183,13 @@ struct Driver(Policy) {
         Allocator allocator;
         OCIEnv* env;
         OCIError *error;
+
+        static const FeatureArray features = [
+            //Feature.InputBinding,
+            //Feature.DateBinding,
+            //Feature.ConnectionPool,
+            Feature.OutputArrayBinding,
+            ];
 
         this(string defaultURI_) {
             allocator = Allocator();
@@ -127,9 +222,6 @@ struct Driver(Policy) {
             }
         }
 
-        bool bindable() {return false;}
-        bool dateBinding() {return false;}
-        bool poolEnable() {return false;}
     }
 
     struct Connection {
@@ -193,11 +285,13 @@ struct Driver(Policy) {
 
     struct Bind {
         ValueType type;
-        void* data;
+        void[] data;
         sb4 allocSize;
         ub2 oType;
-        void* ind;
-        ub2 length;
+        void[] ind;
+        void[] length;
+        void function(ref BindContext ctx) ctor;
+        void function(void[] data) dtor;
     }
 
     // non memeber needed to avoid forward error
@@ -226,6 +320,8 @@ struct Driver(Policy) {
                         OCI_HTYPE_STMT,
                         0,
                         null));
+
+            //attrSet!ub4(OCI_ATTR_PREFETCH_ROWS, 1000);
         }
 
         ~this() {
@@ -252,22 +348,8 @@ struct Driver(Policy) {
 
 
             // get the type of statement
-            check("OCIAttrGet", OCIAttrGet(
-                        stmt,
-                        OCI_HTYPE_STMT,
-                        &stmt_type,
-                        null,
-                        OCI_ATTR_STMT_TYPE,
-                        error));
-
-            check("OCIAttrGet", OCIAttrGet(
-                        stmt,
-                        OCI_HTYPE_STMT,
-                        &binds,
-                        null,
-                        OCI_ATTR_BIND_COUNT,
-                        error));
-
+            stmt_type = attrGet!ub2(OCI_ATTR_STMT_TYPE);
+            binds = attrGet!ub4(OCI_ATTR_BIND_COUNT);
             info("binds: ", binds);
         }
 
@@ -336,6 +418,34 @@ struct Driver(Policy) {
         }
 
         void reset() {}
+        //: Error: template std.database.oracle.database.Driver!(DefaultPolicy).Driver.Statement.attrGet cannot deduce function from argument types !(ushort)(OCIStmt*, uint), candidates are:
+
+        private T attrGet(T)(ub4 attribute) {return attrGet!T(stmt, error, attribute);}
+        private void attrGet(T)(ub4 attribute, ref T value) { return attrGet(stmt, error, attribute, value);}
+        private void attrSet(T)(ub4 attribute, T value) {return attrSet(stmt, error, attribute, value);}
+
+        static T attrGet(T)(OCIStmt *stmt, OCIError *error, ub4 attribute) {
+            T value;
+            ub4 sz = T.sizeof;
+            attrGet!T(stmt, error, attribute, value);
+            return value;
+        }
+
+        static void attrGet(T)(OCIStmt *stmt, OCIError *error, ub4 attribute, ref T value) {
+            return attrGet(stmt, OCI_HTYPE_STMT, error, attribute, value);
+        }
+
+        static void attrGet(T)(void* handle, ub4 handleType, OCIError* error, ub4 attribute, ref T value) {
+            ub4 sz = T.sizeof;
+            check("OCIAttrGet", OCIAttrGet(
+                        handle,
+                        OCI_HTYPE_STMT,
+                        &value,
+                        &sz,
+                        attribute,
+                        error));
+        }
+
     }
 
     struct Result {
@@ -345,35 +455,32 @@ struct Driver(Policy) {
         int columns;
         Array!Describe describe;
         Array!Bind bind;
-        ub4 row_array_size = 1;
+        ub4 rowArraySize;
         sword status;
 
-        this(Statement* stmt_) {
+        this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
+            rowArraySize = rowArraySize_;
             allocator = &stmt.con.db.allocator;
             error = stmt.error;
+            columns = stmt_.attrGet!ub4(OCI_ATTR_PARAM_COUNT);
+
+            if (!columns) return;
+
             build_describe();
             build_bind();
-            next();
         }
 
         ~this() {
-            for(int i = 0; i < bind.length; ++i) {
-                allocator.deallocate(bind[i].data[0..bind[i].allocSize]);
+            foreach(ref b; bind) {
+                if (b.dtor)  b.dtor(b.data);
+                allocator.deallocate(b.data);
+                allocator.deallocate(b.ind);
+                allocator.deallocate(b.length);
             }
         }
 
         void build_describe() {
-            sword numcols;
-            check("OCIAttrGet", OCIAttrGet(
-                        stmt.stmt,
-                        OCI_HTYPE_STMT,
-                        &numcols,
-                        null,
-                        OCI_ATTR_PARAM_COUNT,
-                        error));
-            columns = numcols;
-            info("columns: ", columns);
 
             describe.reserve(columns);
             for(int i = 0; i < columns; ++i) {
@@ -419,99 +526,125 @@ struct Driver(Policy) {
         }
 
         void build_bind() {
+            auto allocator = Allocator();
+
             import core.memory : GC; // needed?
 
             bind.reserve(columns);
 
             for(int i = 0; i < columns; ++i) {
                 bind ~= Bind();
-                auto b = &bind.back();
                 auto d = &describe[i];
+                auto b = &bind.back();
 
-                if (d.oType == SQLT_DAT) {
-                    b.type = ValueType.Date;
-                    b.oType = SQLT_ODT;
-                    //d.define_type = SQLT_ODT;
-                    b.allocSize = OCIDate.sizeof;
-                    b.data = cast(void*)(allocator.allocate(b.allocSize));
-                    emplace(cast(OCIDate*) b.data);
-                } else {
-                    //auto ctx = BindContext(d,b);
-                    //strBind(ctx);
-                    b.type = ValueType.String;
-                    b.oType = SQLT_STR;
-                    b.allocSize = cast(sb4) (d.size + 1);
-                    b.data = cast(void*)(allocator.allocate(b.allocSize));
-                }
+                BindContext ctx;
+                ctx.describe = d;
+                ctx.bind = b;
+                ctx.allocator = &allocator;
+                ctx.rowArraySize = rowArraySize;
 
-                // initialize date?
+                BindInfo.bind(ctx);
 
-                GC.addRange(b.data, b.allocSize);
-
-                log("bind: type: ", b.oType, ", allocSize:", b.allocSize);
+                info("bind: type: ", b.oType, ", allocSize:", b.allocSize);
 
                 check("OCIDefineByPos", OCIDefineByPos(
                             stmt.stmt,
                             &d.define,
                             error,
                             cast(ub4) i+1,
-                            b.data,
+                            b.data.ptr,
                             b.allocSize,
                             b.oType,
-                            &b.ind,
-                            &b.length,
+                            cast(dvoid *) b.ind.ptr, // check
+                            cast(ub2*) b.length.ptr,
                             null,
                             OCI_DEFAULT));
+
+                if (rowArraySize > 1) {
+                    check("OCIDefineArrayOfStruct", OCIDefineArrayOfStruct(
+                                d.define,
+                                error,
+                                b.allocSize,        
+                                sb2.sizeof,
+                                ub2.sizeof,
+                                0));
+                }
             }
         }
 
-        bool start() {return status == OCI_SUCCESS;}
+        bool hasResult() {return columns != 0;}
 
-        bool next() {
+        int fetch() {
+            if (status == OCI_NO_DATA) return 0;
+
+            int rowsFetched;
 
             //info("OCIStmtFetch2");
+
             status = OCIStmtFetch2(
                     stmt.stmt,
                     error,
-                    row_array_size,
+                    rowArraySize,
                     OCI_FETCH_NEXT,
                     0,
                     OCI_DEFAULT);
 
-            if (status == OCI_SUCCESS) {
-                return true; 
-            } else if (status == OCI_NO_DATA) {
-                stmt.reset();
-                return false;
+            if (rowArraySize > 1) {
+                // clean up
+                ub4 value;
+                check("OCIAttrGet",OCIAttrGet(
+                            stmt.stmt,
+                            OCI_HTYPE_STMT,
+                            &value,
+                            null,
+                            OCI_ATTR_ROWS_FETCHED,
+                            error));
+                rowsFetched = value;
+            } else {
+                rowsFetched = (status == OCI_NO_DATA ? 0 : 1);
             }
 
+            if (status == OCI_SUCCESS) {
+                return rowsFetched; 
+            } else if (status == OCI_NO_DATA) {
+                //stmt.reset();
+                return rowsFetched;
+            }
+
+            throw new DatabaseException("fetch error"); // fix
             //check("SQLFetch", SQL_HANDLE_STMT, stmt.data_.stmt, status);
-            return false;
+            //return 0;
         }
 
-        auto get(X:string)(Bind *b) {
+        auto get(X:string)(Cell* cell) {
             import core.stdc.string: strlen;
-            checkType(b.oType, SQLT_STR);
-            auto ptr = cast(immutable char*) b.data;
+            checkType(cell.bind.oType, SQLT_STR);
+            auto ptr = cast(immutable char*) data(cell);
             return cast(string) ptr[0..strlen(ptr)]; // fix with length
         }
 
-        auto get(X:int)(Bind *b) {
-            checkType(b.oType, SQLT_INT);
-            return *(cast(int*) b.data);
+        auto get(X:int)(Cell* cell) {
+            checkType(cell.bind.oType, SQLT_INT);
+            return *(cast(int*) data(cell));
         }
 
-        auto get(X:Date)(Bind *b) {
+        auto get(X:Date)(Cell* cell) {
             //return Date(2016,1,1); // fix
-            checkType(b.oType, SQLT_ODT);
-            auto d = cast(OCIDate*) b.data;
+            checkType(cell.bind.oType, SQLT_ODT);
+            auto d = cast(OCIDate*) data(cell);
             return Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
         }
 
-        static void checkType(ub2 a, ub2 b) {
+        private void* data(Cell* cell) {
+            return cell.bind.data.ptr + cell.bind.allocSize * cell.rowIdx;
+        }
+
+        private static void checkType(ub2 a, ub2 b) {
             if (a != b) throw new DatabaseException("type mismatch");
         }
 
     }
+
 }
+
 

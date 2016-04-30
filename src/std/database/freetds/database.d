@@ -30,6 +30,7 @@ auto createDatabase()(string defaultURI="") {
 
 struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver!Policy,Policy);
 
     private static bool isError(RETCODE ret) {
         return 
@@ -54,9 +55,11 @@ struct Driver(Policy) {
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        bool bindable() {return false;}
-        bool dateBinding() {return false;}
-        bool poolEnable() {return false;}
+        static const FeatureArray features = [
+            //Feature.InputBinding,
+            //Feature.DateBinding,
+            //Feature.ConnectionPool,
+            ];
 
         Allocator allocator;
 
@@ -235,12 +238,12 @@ struct Driver(Policy) {
         private auto con() {return stmt.con;}
         private auto dbproc() {return con.con;}
 
-        this(Statement* stmt_) {
+        this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
             allocator = stmt.allocator;
 
             status = check("dbresults", dbresults(dbproc));
-            if (status == NO_MORE_RESULTS) return;
+            if (!hasResult()) return;
 
             columns = dbnumcols(dbproc);
             info("COLUMNS:", columns);
@@ -249,7 +252,6 @@ struct Driver(Policy) {
 
             build_describe();
             build_bind();
-            next();
         }
 
         ~this() {
@@ -326,35 +328,35 @@ struct Driver(Policy) {
             }
         }
 
-        bool start() {return status == REG_ROW;}
+        bool hasResult() {return status != NO_MORE_RESULTS;}
 
-        bool next() {
+        int fetch() {
             status = check("dbnextrow", dbnextrow(dbproc));
             if (status == REG_ROW) {
-                return true; 
+                return 1; 
             } else if (status == NO_MORE_ROWS) {
                 stmt.reset();
-                return false;
+                return 0;
             }
-            return false;
+            return 0;
         }
 
-        auto get(X:string)(Bind *b) {
+        auto get(X:string)(Cell* cell) {
             import core.stdc.string: strlen;
-            checkType(b.bindType, NTBSTRINGBIND);
-            auto ptr = cast(immutable char*) b.data.ptr;
+            checkType(cell.bind.bindType, NTBSTRINGBIND);
+            auto ptr = cast(immutable char*) cell.bind.data.ptr;
             return cast(string) ptr[0..strlen(ptr)];
         }
 
-        auto get(X:int)(Bind *b) {
+        auto get(X:int)(Cell* cell) {
             //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
             //checkType(b.bindType, SQL_C_LONG);
             //return *(cast(int*) b.data);
             return 0;
         }
 
-        auto get(X:Date)(Bind *b) {
-            auto ptr = cast(DBDATETIME*) b.data.ptr;
+        auto get(X:Date)(Cell* cell) {
+            auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
             DBDATEREC d;
             check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
             return Date(d.year, d.month, d.day);

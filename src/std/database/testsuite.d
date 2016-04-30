@@ -5,6 +5,8 @@ import std.stdio;
 import std.experimental.logger;
 import std.datetime;
 
+import std.database.front: Feature;
+
 void testAll(Database) (string source) {
 
     databaseCreation!Database(source);
@@ -69,7 +71,7 @@ void fieldAccess(Database)(Database db) {
 }
 
 void bindTest0(Database) (Database db) {
-    if (!db.bindable()) {
+    if (!db.hasFeature(Feature.InputBinding)) {
         writeln("skip bindTest");
         return;
     }
@@ -85,7 +87,7 @@ void bindTest0(Database) (Database db) {
 
 
 void bindTest1(Database) (Database db) {
-    if (!db.bindable()) {
+    if (!db.hasFeature(Feature.InputBinding)) {
         writeln("skip bindTest");
         return;
     }
@@ -101,7 +103,7 @@ void bindTest1(Database) (Database db) {
 }
 
 void bindTest2(Database) (Database db) {
-    if (!db.bindable()) {
+    if (!db.hasFeature(Feature.InputBinding)) {
         writeln("skip bindTest");
         return;
     }
@@ -122,7 +124,7 @@ void bindTest2(Database) (Database db) {
 }
 
 void bindInsertTest(Database) (Database db) {
-    if (!db.bindable()) {
+    if (!db.hasFeature(Feature.InputBinding)) {
         writeln("skip bindInsertTest");
         return;
     }
@@ -143,7 +145,7 @@ void bindInsertTest(Database) (Database db) {
 void dateBindTest(Database) (Database db) {
     // test date input and output binding
     import std.datetime;
-    if (!db.dateBinding()) {
+    if (!db.hasFeature(Feature.DateBinding)) {
         writeln("skip dateInputBindTest");
         return;
     }

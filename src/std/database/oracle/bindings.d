@@ -5,6 +5,9 @@ enum OCI_SUCCESS = 0;
 enum OCI_SUCCESS_WITH_INFO = 1;
 enum OCI_NO_DATA = 100;
 
+enum OCI_ATTR_PREFETCH_ROWS = 13;
+enum OCI_ATTR_ROWS_FETCHED = 197;
+
 enum OCI_THREADED = 0x00000001;
 enum OCI_OBJECT = 0x00000002;
 
@@ -153,12 +156,23 @@ extern(System) {
             void  *attributep, ub4 *sizep, ub4 attrtype, 
             OCIError *errhp);
 
+    sword OCIAttrSet (void  *trgthndlp, ub4 trghndltyp, void  *attributep,
+                    ub4 size, ub4 attrtype, OCIError *errhp);
+
     sword OCIParamGet (const void  *hndlp, ub4 htype, OCIError *errhp, 
             void  **parmdpp, ub4 pos);
 
     sword OCIDefineByPos (OCIStmt *stmtp, OCIDefine **defnp, OCIError *errhp,
             ub4 position, void  *valuep, sb4 value_sz, ub2 dty,
             void  *indp, ub2 *rlenp, ub2 *rcodep, ub4 mode);
+
+    sword OCIDefineArrayOfStruct(
+            OCIDefine *defnp,
+            OCIError *errhp,
+            ub4 pvskip,
+            ub4 indskip,
+            ub4 rlskip,
+            ub4 rcskip);
 
     sword OCIDateTimeGetDate(void *hndl, OCIError *err,  const OCIDateTime *date,
             sb2 *year, ub1 *month, ub1 *day );

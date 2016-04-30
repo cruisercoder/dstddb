@@ -5,6 +5,7 @@ import std.container.array;
 
 // experimental detached rowset
 
+/*
 struct RowSet {
     private struct RowData {
         int[3] data;
@@ -29,8 +30,9 @@ struct RowSet {
         alias Result = .RowSet;
         alias Bind = RowSet.Bind;
     }
+    struct Policy {}
 
-    alias Converter = .Converter!Driver;
+    alias Converter = .Converter!(Driver,Policy);
 
 
     struct TypeInfo(T:int) {static int type() {return ValueType.Int;}}
@@ -79,5 +81,5 @@ struct RowSet {
     private Array!RowData data;
 }
 
-
+*/
 

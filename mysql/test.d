@@ -29,6 +29,7 @@ unittest {
 
 //auto db = createDatabase("mysql://127.0.0.1/test");
 
+/*
 void perf1() {
     import std.datetime;
     import std.conv;
@@ -69,4 +70,4 @@ void perf1() {
     writeln("sum: ", sum);
     writeln("time: ", to!Duration(sw2.peek));
 }
-
+*/
