@@ -24,16 +24,16 @@ void dateTest() {
     con.query("drop table d1");
     con.query("create table d1(a date)");
     con.query("insert into d1 values ('2016-01-15')");
-    auto rs = con.query("select * from d1");
-    writeResult(rs[]);
+    auto rows = con.query("select * from d1").rows;
+    rows.writeRows;
 }
 
 void example() {
     import std.database.freetds;
     //auto db = createDatabase("freetds://server/test?username=sa&password=admin");
     auto db = createDatabase("freetds://10.211.55.3:1433/test?username=sa&password=admin");
-    auto result = db.query("SELECT 1,2,'abc'");
-    foreach (r; result) {
+    auto rows = db.query("SELECT 1,2,'abc'").rows;
+    foreach (r; rows) {
         for(int c = 0; c != r.columns; ++c) writeln("column: ",c,", value: ",r[c].as!string);
     }
 }

@@ -17,33 +17,9 @@ unittest {
     /*
        auto database3 = createDatabase();
        auto database4 = std.database.oracle.createDatabase();
-     */
 
     //auto database = Database!DefaultPolicy.create("oracle");
     //auto database = Database.create("oracle");
-
-    //auto database = database("oracle");
-    //auto con = database.connection();
-
-    /*
-       auto db = database("oracle");
-       auto con = db.connection();
-
-       try {
-       con.query("drop table t");
-       } catch (Exception e) {
-       }
-
-       con.query("create table t(name varchar(20), age int)");
-       con.query("insert into t values('Bob',12)");
-       con.query("insert into t values('Joe',9)");
-
-       con.statement("select * from t");
-    //auto res = result(stmt);
-    //writeResult(res);
-
-    //writeResultRange(stmt.range());
-    writeResultRange(con.statement("select * from t").range());
      */
 
 }
@@ -71,12 +47,12 @@ void testArrayOutputBinding() {
     real[N] durationsUsecs;
 
     foreach(i; 0..N) {
-        auto rs = con.rowArraySize(100).query("select * from t1");
+        auto rows = con.rowArraySize(100).query("select * from t1").rows;
         StopWatch sw;
         sw.start();
 
         int s;
-        foreach(r;rs) {
+        foreach(r;rows) {
             s += r[0].as!int + r[1].as!int;
         }
 
@@ -102,7 +78,7 @@ void dateTest() {
     con.query("drop table d1");
     con.query("create table d1(a date, b int)");
     con.query("insert into d1 values(to_date('2015/04/05','yyyy/mm/dd'), 123)");
-    auto rs = con.query("select * from d1");
-    assert(rs[].front()[0].as!Date == Date(2015,4,5));
+    auto rows = con.query("select * from d1").rows;
+    assert(rows.front()[0].as!Date == Date(2015,4,5));
 }
 

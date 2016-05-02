@@ -11,8 +11,8 @@ import std.database.common;
 import std.database.exception;
 import std.database.source;
 import std.database.allocator;
-import std.container.array;
 import std.experimental.logger;
+import std.container.array;
 
 import std.datetime;
 
@@ -238,7 +238,7 @@ struct Driver(Policy) {
 
             string dbname = getDBName(source);
 
-            check("OCILogon", OCILogon(
+            check("OCILogon: ", OCILogon(
                         db_.env,
                         error,
                         &svc_ctx,
@@ -370,8 +370,13 @@ struct Driver(Policy) {
         }
 
         void query(X...) (X args) {
-            bindAll(args);
-            query();
+            foreach (arg; args) {
+                info("ARG: ", arg);
+            }
+
+            info("variadic query not implemented yet");
+            //bindAll(args);
+            //query();
         }
 
         private void bindAll(T...) (T args) {

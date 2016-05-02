@@ -65,4 +65,13 @@ URI toURI(string str) {
     return uri;
 }
 
+bool toURI(string str, ref URI uri) nothrow {
+    try {
+        auto u = toURI(str); 
+        uri = u;
+        return true;
+    } catch (Exception e) {}
+    return true;
+}
+
 

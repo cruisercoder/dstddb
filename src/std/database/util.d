@@ -5,27 +5,34 @@ import std.stdio;
 import std.traits;
 import std.string;
 
-void writeResult(T) (T t) {
-    static if (hasMember!(T, "opSlice")) { // improve
-        writeResultRange(t[]);
-    } else {
-        writeResultRange(t);
-    }
-}
+/*
+   // trying to overload write/print
+void writeRows(T) (T t)
+    if (hasMember!(T, "rows") || hasMember!(T, "rowSetTag")) {write(t);}
+*/
 
-private void writeResultRange(T) (T range) {
-    static char[100] s = '-';
-    int w = 80;
-    writeln(s[0..w-1]);
-    foreach (r; range) {
-        for(int c = 0; c != r.columns; ++c) {
-            if (c) write(", ");
-            write("", r[c].chars()); // why fail when not .chars()?
-        }
-        writeln();
+// should return object being written to
+
+void writeRows(T) (T t) 
+    if (hasMember!(T, "rows")) {
+        t.rows.writeRows;
     }
-    writeln(s[0..w-1]);
-}
+
+void writeRows(T) (T t) 
+    if (hasMember!(T, "rowSetTag")) {
+        static char[100] s = '-';
+        int w = 80;
+        writeln(s[0..w-1]);
+        foreach (r; t) {
+            for(int c = 0; c != r.width; ++c) {
+                if (c) write(", ");
+                write("", r[c].chars); //chars sitll a problem
+            }
+            writeln();
+        }
+        writeln(s[0..w-1]);
+    }
+
 
 struct QueryVariable(QueryVariableType t : QueryVariableType.Dollar) {
     import std.conv;
