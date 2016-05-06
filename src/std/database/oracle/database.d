@@ -304,7 +304,6 @@ struct Driver(Policy) {
         OCIError *error;
         OCIStmt *stmt;
         ub2 stmt_type;
-        bool hasRows;
         int binds;
         Array!Bind inputBind;
 
@@ -377,6 +376,12 @@ struct Driver(Policy) {
             info("variadic query not implemented yet");
             //bindAll(args);
             //query();
+        }
+
+        bool hasRows() {
+            // need a better way
+            int columns = attrGet!ub4(OCI_ATTR_PARAM_COUNT);
+            return columns != 0;
         }
 
         private void bindAll(T...) (T args) {
@@ -469,186 +474,185 @@ struct Driver(Policy) {
             allocator = &stmt.con.db.allocator;
             error = stmt.error;
             columns = stmt_.attrGet!ub4(OCI_ATTR_PARAM_COUNT);
-
-            if (!columns) return;
-
             build_describe();
             build_bind();
+    }
+
+    ~this() {
+        foreach(ref b; bind) {
+            if (b.dtor)  b.dtor(b.data);
+            allocator.deallocate(b.data);
+            allocator.deallocate(b.ind);
+            allocator.deallocate(b.length);
         }
+    }
 
-        ~this() {
-            foreach(ref b; bind) {
-                if (b.dtor)  b.dtor(b.data);
-                allocator.deallocate(b.data);
-                allocator.deallocate(b.ind);
-                allocator.deallocate(b.length);
-            }
-        }
+    void build_describe() {
 
-        void build_describe() {
+        describe.reserve(columns);
+        for(int i = 0; i < columns; ++i) {
+            describe ~= Describe();
+            auto d = &describe.back();
 
-            describe.reserve(columns);
-            for(int i = 0; i < columns; ++i) {
-                describe ~= Describe();
-                auto d = &describe.back();
+            OCIParam *col;
+            check("OCIParamGet",OCIParamGet(
+                        stmt.stmt,
+                        OCI_HTYPE_STMT,
+                        error,
+                        cast(void**) &col,
+                        i+1));
 
-                OCIParam *col;
-                check("OCIParamGet",OCIParamGet(
-                            stmt.stmt,
-                            OCI_HTYPE_STMT,
-                            error,
-                            cast(void**) &col,
-                            i+1));
+            check("OCIAttrGet", OCIAttrGet(
+                        col,
+                        OCI_DTYPE_PARAM,
+                        &d.ora_name,
+                        &d.name_len,
+                        OCI_ATTR_NAME,
+                        error));
 
-                check("OCIAttrGet", OCIAttrGet(
-                            col,
-                            OCI_DTYPE_PARAM,
-                            &d.ora_name,
-                            &d.name_len,
-                            OCI_ATTR_NAME,
-                            error));
+            check("OCIAttrGet", OCIAttrGet(
+                        col,
+                        OCI_DTYPE_PARAM,
+                        &d.oType,
+                        null,
+                        OCI_ATTR_DATA_TYPE,
+                        error));
 
-                check("OCIAttrGet", OCIAttrGet(
-                            col,
-                            OCI_DTYPE_PARAM,
-                            &d.oType,
-                            null,
-                            OCI_ATTR_DATA_TYPE,
-                            error));
+            check("OCIAttrGet", OCIAttrGet(
+                        col,
+                        OCI_DTYPE_PARAM,
+                        &d.size,
+                        null,
+                        OCI_ATTR_DATA_SIZE,
+                        error));
 
-                check("OCIAttrGet", OCIAttrGet(
-                            col,
-                            OCI_DTYPE_PARAM,
-                            &d.size,
-                            null,
-                            OCI_ATTR_DATA_SIZE,
-                            error));
-
-                d.name = to!string(cast(char*)(d.ora_name)[0..d.name_len]);
-                info("describe: name: ", d.name, ", type: ", d.oType, ", size: ", d.size);
-            }
-
-        }
-
-        void build_bind() {
-            auto allocator = Allocator();
-
-            import core.memory : GC; // needed?
-
-            bind.reserve(columns);
-
-            for(int i = 0; i < columns; ++i) {
-                bind ~= Bind();
-                auto d = &describe[i];
-                auto b = &bind.back();
-
-                BindContext ctx;
-                ctx.describe = d;
-                ctx.bind = b;
-                ctx.allocator = &allocator;
-                ctx.rowArraySize = rowArraySize;
-
-                BindInfo.bind(ctx);
-
-                info("bind: type: ", b.oType, ", allocSize:", b.allocSize);
-
-                check("OCIDefineByPos", OCIDefineByPos(
-                            stmt.stmt,
-                            &d.define,
-                            error,
-                            cast(ub4) i+1,
-                            b.data.ptr,
-                            b.allocSize,
-                            b.oType,
-                            cast(dvoid *) b.ind.ptr, // check
-                            cast(ub2*) b.length.ptr,
-                            null,
-                            OCI_DEFAULT));
-
-                if (rowArraySize > 1) {
-                    check("OCIDefineArrayOfStruct", OCIDefineArrayOfStruct(
-                                d.define,
-                                error,
-                                b.allocSize,        
-                                sb2.sizeof,
-                                ub2.sizeof,
-                                0));
-                }
-            }
-        }
-
-        bool hasResult() {return columns != 0;}
-
-        int fetch() {
-            if (status == OCI_NO_DATA) return 0;
-
-            int rowsFetched;
-
-            //info("OCIStmtFetch2");
-
-            status = OCIStmtFetch2(
-                    stmt.stmt,
-                    error,
-                    rowArraySize,
-                    OCI_FETCH_NEXT,
-                    0,
-                    OCI_DEFAULT);
-
-            if (rowArraySize > 1) {
-                // clean up
-                ub4 value;
-                check("OCIAttrGet",OCIAttrGet(
-                            stmt.stmt,
-                            OCI_HTYPE_STMT,
-                            &value,
-                            null,
-                            OCI_ATTR_ROWS_FETCHED,
-                            error));
-                rowsFetched = value;
-            } else {
-                rowsFetched = (status == OCI_NO_DATA ? 0 : 1);
-            }
-
-            if (status == OCI_SUCCESS) {
-                return rowsFetched; 
-            } else if (status == OCI_NO_DATA) {
-                //stmt.reset();
-                return rowsFetched;
-            }
-
-            throw new DatabaseException("fetch error"); // fix
-            //check("SQLFetch", SQL_HANDLE_STMT, stmt.data_.stmt, status);
-            //return 0;
-        }
-
-        auto get(X:string)(Cell* cell) {
-            import core.stdc.string: strlen;
-            checkType(cell.bind.oType, SQLT_STR);
-            auto ptr = cast(immutable char*) data(cell);
-            return cast(string) ptr[0..strlen(ptr)]; // fix with length
-        }
-
-        auto get(X:int)(Cell* cell) {
-            checkType(cell.bind.oType, SQLT_INT);
-            return *(cast(int*) data(cell));
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            //return Date(2016,1,1); // fix
-            checkType(cell.bind.oType, SQLT_ODT);
-            auto d = cast(OCIDate*) data(cell);
-            return Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
-        }
-
-        private void* data(Cell* cell) {
-            return cell.bind.data.ptr + cell.bind.allocSize * cell.rowIdx;
-        }
-
-        private static void checkType(ub2 a, ub2 b) {
-            if (a != b) throw new DatabaseException("type mismatch");
+            d.name = to!string(cast(char*)(d.ora_name)[0..d.name_len]);
+            info("describe: name: ", d.name, ", type: ", d.oType, ", size: ", d.size);
         }
 
     }
+
+    void build_bind() {
+        auto allocator = Allocator();
+
+        import core.memory : GC; // needed?
+
+        bind.reserve(columns);
+
+        for(int i = 0; i < columns; ++i) {
+            bind ~= Bind();
+            auto d = &describe[i];
+            auto b = &bind.back();
+
+            BindContext ctx;
+            ctx.describe = d;
+            ctx.bind = b;
+            ctx.allocator = &allocator;
+            ctx.rowArraySize = rowArraySize;
+
+            BindInfo.bind(ctx);
+
+            info("bind: type: ", b.oType, ", allocSize:", b.allocSize);
+
+            check("OCIDefineByPos", OCIDefineByPos(
+                        stmt.stmt,
+                        &d.define,
+                        error,
+                        cast(ub4) i+1,
+                        b.data.ptr,
+                        b.allocSize,
+                        b.oType,
+                        cast(dvoid *) b.ind.ptr, // check
+                        cast(ub2*) b.length.ptr,
+                        null,
+                        OCI_DEFAULT));
+
+            if (rowArraySize > 1) {
+                check("OCIDefineArrayOfStruct", OCIDefineArrayOfStruct(
+                            d.define,
+                            error,
+                            b.allocSize,        
+                            sb2.sizeof,
+                            ub2.sizeof,
+                            0));
+            }
+        }
+    }
+
+    int fetch() {
+        if (status == OCI_NO_DATA) return 0;
+
+        int rowsFetched;
+
+        //info("OCIStmtFetch2");
+
+        status = OCIStmtFetch2(
+                stmt.stmt,
+                error,
+                rowArraySize,
+                OCI_FETCH_NEXT,
+                0,
+                OCI_DEFAULT);
+
+        if (rowArraySize > 1) {
+            // clean up
+            ub4 value;
+            check("OCIAttrGet",OCIAttrGet(
+                        stmt.stmt,
+                        OCI_HTYPE_STMT,
+                        &value,
+                        null,
+                        OCI_ATTR_ROWS_FETCHED,
+                        error));
+            rowsFetched = value;
+        } else {
+            rowsFetched = (status == OCI_NO_DATA ? 0 : 1);
+        }
+
+        if (status == OCI_SUCCESS) {
+            return rowsFetched; 
+        } else if (status == OCI_NO_DATA) {
+            //stmt.reset();
+            return rowsFetched;
+        }
+
+        throw new DatabaseException("fetch error"); // fix
+        //check("SQLFetch", SQL_HANDLE_STMT, stmt.data_.stmt, status);
+        //return 0;
+    }
+
+    auto get(X:string)(Cell* cell) {
+        import core.stdc.string: strlen;
+        checkType(cell.bind.oType, SQLT_STR);
+        auto ptr = cast(immutable char*) data(cell);
+        return cast(string) ptr[0..strlen(ptr)]; // fix with length
+    }
+
+    auto name(size_t idx) {
+        return describe[idx].name;
+    }
+
+    auto get(X:int)(Cell* cell) {
+        checkType(cell.bind.oType, SQLT_INT);
+        return *(cast(int*) data(cell));
+    }
+
+    auto get(X:Date)(Cell* cell) {
+        //return Date(2016,1,1); // fix
+        checkType(cell.bind.oType, SQLT_ODT);
+        auto d = cast(OCIDate*) data(cell);
+        return Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
+    }
+
+    private void* data(Cell* cell) {
+        return cell.bind.data.ptr + cell.bind.allocSize * cell.rowIdx;
+    }
+
+    private static void checkType(ub2 a, ub2 b) {
+        if (a != b) throw new DatabaseException("type mismatch");
+    }
+
+}
 
 }
 

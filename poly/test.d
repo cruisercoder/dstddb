@@ -32,7 +32,23 @@ unittest {
 
     // these are all heading to test suite
 
-    if (true) {
+    if (true) { //opDispatch
+        auto db = createDatabase("oracle");
+        auto con = db.connection;
+        auto rows = db.query("select * from t").rows;
+
+        foreach (row; rows) {
+            for(int c = 0; c != row.width; ++c) {
+                //log("NAME: ", row[c].name);
+                writeln("a:", row.A);
+                writeln("b:", row.B);
+            }
+            writeln;
+        }
+
+    }
+
+    if (false) {
         auto db = createDatabase;
         auto con1 = db.connection("oracle").autoCommit(false);
         auto con2 = db.connection("oracle").autoCommit(false);
@@ -42,7 +58,7 @@ unittest {
 
         //con1.begin.query("insert into account(id,amount) values(1,100)");
         //con2.begin.query("insert into account(id,amount) values(2,-100)");
-        
+
         con1.commit;
         con2.commit;
     }

@@ -337,12 +337,17 @@ struct Driver(Policy) {
             driver.stmtVtable.query(stmt);
         }
 
-        void query(A...) (A args) {
-            auto a = BindArgs(); // cant use ctor
+        void query(A...) (ref A args) {
+            import std.range;
+            //auto a = BindArgs(only(args));
+            auto a = BindArgs();
             a.reserve(args.length);
             foreach(arg; args) a ~= Variant(arg);
             driver.stmtVtable.variadicQuery(stmt, a);
         }
+
+        bool hasRows() {return true;} // fix
+
 
         void bind(int n, int value) {
         }
@@ -387,6 +392,10 @@ struct Driver(Policy) {
 
         int fetch() {
             return 0;
+        }
+
+        auto name(size_t idx) {
+            return "-name-";
         }
 
         auto get(X:string)(Cell* cell) {

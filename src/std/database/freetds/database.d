@@ -191,6 +191,9 @@ struct Driver(Policy) {
             query();
         }
 
+        //bool hasRows() {return status != NO_MORE_RESULTS;}
+        bool hasRows() {return true;}
+
         private void bindAll(T...) (T args) {
             //int col;
             //foreach (arg; args) bind(++col, arg);
@@ -241,15 +244,8 @@ struct Driver(Policy) {
         this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
             allocator = stmt.allocator;
-
             status = check("dbresults", dbresults(dbproc));
-            if (!hasResult()) return;
-
             columns = dbnumcols(dbproc);
-            info("COLUMNS:", columns);
-
-            //if (!columns) return;
-
             build_describe();
             build_bind();
         }
@@ -328,8 +324,6 @@ struct Driver(Policy) {
             }
         }
 
-        bool hasResult() {return status != NO_MORE_RESULTS;}
-
         int fetch() {
             status = check("dbnextrow", dbnextrow(dbproc));
             if (status == REG_ROW) {
@@ -339,6 +333,10 @@ struct Driver(Policy) {
                 return 0;
             }
             return 0;
+        }
+
+        auto name(size_t idx) {
+            return to!string(describe[idx].name);
         }
 
         auto get(X:string)(Cell* cell) {

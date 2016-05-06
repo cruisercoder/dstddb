@@ -143,7 +143,7 @@ struct Driver(Policy) {
         string sql;
         Allocator *allocator;
         SQLHSTMT stmt;
-        bool hasRows; // not working
+        bool hasRows_; // not working
         int binds;
         Array!Bind inputbind_;
 
@@ -237,12 +237,12 @@ struct Driver(Policy) {
                         cast(SQLCHAR*) toStringz(sql),
                         SQL_NTS);
                 check("SQLExecuteDirect()", SQL_HANDLE_STMT, stmt, ret);
-                hasRows = ret != SQL_NO_DATA;
+                hasRows_ = ret != SQL_NO_DATA;
             } else {
                 info("sql execute prepared: ", sql);
                 SQLRETURN ret = SQLExecute(stmt);
                 check("SQLExecute()", SQL_HANDLE_STMT, stmt, ret);
-                hasRows = ret != SQL_NO_DATA;
+                hasRows_ = ret != SQL_NO_DATA;
             }
         }
 
@@ -250,6 +250,8 @@ struct Driver(Policy) {
             bindAll(args);
             query();
         }
+
+        bool hasRows() {return hasRows_;}
 
         void exec() {
             check("SQLExecDirect", SQLExecDirect(stmt,cast(SQLCHAR*) toStringz(sql), SQL_NTS));
@@ -320,9 +322,6 @@ struct Driver(Policy) {
             SQLSMALLINT v;
             check("SQLNumResultCols", SQLNumResultCols (stmt.stmt, &v));
             columns = v;
-
-            if (!hasResult()) return;
-
             build_describe();
             build_bind();
         }
@@ -402,8 +401,6 @@ struct Driver(Policy) {
             }
         }
 
-        bool hasResult() {return columns !=0;}
-
         int fetch() {
             //info("SQLFetch");
             status = SQLFetch(stmt.stmt);
@@ -415,6 +412,11 @@ struct Driver(Policy) {
             }
             check("SQLFetch", SQL_HANDLE_STMT, stmt.stmt, status);
             return 0;
+        }
+
+        auto name(size_t idx) {
+            auto d = &describe[idx];
+            return cast(string) d.name[0..d.nameLen];
         }
 
         auto get(X:string)(Cell* cell) {

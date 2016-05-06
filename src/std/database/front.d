@@ -81,8 +81,7 @@ struct BasicDatabase(D,P) {
     // go with non-static hasFeature for now to accomidate poly driver
 
     bool hasFeature(Feature feature) {return hasFeature(data_.database, feature);}
-
-    auto ref driverDatabase() {return data_.database;}
+auto ref driverDatabase() {return data_.database;}
 
     private struct Payload {
         string defaultURI;
@@ -258,7 +257,6 @@ struct BasicStatement(D,P) {
     auto query() {
         data_.query();
         state = State.Executed;
-        //return Result(this, rowArraySize_);
         return this;
     }
 
@@ -272,6 +270,8 @@ struct BasicStatement(D,P) {
         if (state != State.Executed) throw new DatabaseException("not executed");
         return this;
     }
+
+    bool hasRows() {return data_.hasRows;}
 
     // rows()
     // accessor for single rowSet returned
@@ -323,12 +323,11 @@ struct BasicResult(D,P) {
     alias Bind = Driver.Bind;
     //alias Row = .Row;
 
-
     this(Statement stmt, int rowArraySize = 1) {
         stmt_ = stmt;
         rowArraySize_ = rowArraySize;
         data_ = Data(&stmt.data_.refCountedPayload(), rowArraySize_);
-        if (!data_.hasResult()) return;
+        if (!stmt_.hasRows) throw new DatabaseException("not a result query");
         rowsFetched_ = data_.fetch();
     }
 
@@ -357,6 +356,18 @@ package:
 
     alias RefCounted!(ResultImpl, RefCountedAutoInitialize.no) Data;
     Data data_;
+
+    // these need to move
+    int width() {return data_.columns;}
+
+    private size_t index(string name) {
+        import std.uni;
+        // slow name lookup, all case insensitive for now
+        for(int i=0; i!=width; i++) {
+            if (sicmp(data_.name(i), name) == 0) return i;
+        }
+        throw new DatabaseException("column name not found:" ~ name);
+    }
 }
 
 struct BasicColumnSet(D,P) {
@@ -500,11 +511,16 @@ struct BasicRow(D,P) {
 
     auto opIndex(Column column) {return opIndex(column.idx);}
 
+    // experimental
+    auto opDispatch(string s)() {
+        return opIndex(rows_.result_.index(s));
+    }
+
     Value opIndex(size_t idx) {
         auto result = &rows_.result_;
         // needs work
         // sending a ptr to cell instead of reference (dangerous)
-        auto cell = Cell(result, &result.data_.bind[idx]);
+        auto cell = Cell(result, &result.data_.bind[idx], idx);
         return Value(result, cell);
     }
 }
@@ -529,7 +545,7 @@ struct BasicValue(D,P) {
     }
 
     private auto resultPtr() {
-        return &result_.result();
+        return &result_.result(); // last parens matter here (something about delegate)
     }
 
     auto type() {return cell_.bind.type;}
@@ -543,6 +559,8 @@ struct BasicValue(D,P) {
     auto as(T:Variant)() {return Converter.convert!T(resultPtr, cell_);}
 
     bool isNull() {return false;} //fix
+
+    string name() {return resultPtr.name(cell_.idx_);}
 
     auto get(T)() {return Nullable!T(as!T);}
 
@@ -583,10 +601,12 @@ struct BasicCell(D,P) {
     alias Bind = Driver.Bind;
     private Bind* bind_;
     private int rowIdx_;
+    private size_t idx_;
 
-    this(Result *r, Bind *b) {
+    this(Result *r, Bind *b, size_t idx) {
         bind_ = b;
         rowIdx_ = r.rowIdx_;
+        idx_ = idx;
     }
 
     auto bind() {return bind_;}

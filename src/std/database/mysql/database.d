@@ -52,26 +52,26 @@ private static bool isError()(int ret) {
 }
 
 private static T* check(T)(string msg, T* ptr) {
-    info(msg);
-    if (!ptr) createError(msg);
+    info(msg, ":", ptr);
+    if (!ptr) raiseError(msg);
     return ptr;
 }
 
 private static int check()(string msg, MYSQL_STMT* stmt, int ret) {
     info(msg, ":", ret);
-    if (isError(ret)) createError(msg,stmt,ret);
+    if (isError(ret)) raiseError(msg,stmt,ret);
     return ret;
 }
 
-private static void createError()(string msg) {
+private static void raiseError()(string msg) {
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
-private static void createError()(string msg, int ret) {
+private static void raiseError()(string msg, int ret) {
     throw new DatabaseException("mysql error: status: " ~ to!string(ret) ~ ":" ~ msg);
 }
 
-private static void createError()(string msg, MYSQL_STMT* stmt, int ret) {
+private static void raiseError()(string msg, MYSQL_STMT* stmt, int ret) {
     import core.stdc.string: strlen;
     const(char*) err = mysql_stmt_error(stmt);
     throw new DatabaseException("mysql error: " ~ msg);
@@ -176,7 +176,6 @@ private struct Driver(Policy) {
             string sql;
             Allocator *allocator;
             MYSQL_STMT *stmt;
-            bool hasRows;
             uint binds;
             Array!Bind inputBind;
             Array!MYSQL_BIND mysqlBind;
@@ -227,6 +226,8 @@ private struct Driver(Policy) {
                 bindAll(args);
                 query();
             }
+
+            bool hasRows() {return true;}
 
             void reset() {
             }
@@ -322,7 +323,7 @@ private struct Driver(Policy) {
 
                 describe.reserve(columns);
 
-                for(int i = 0; i < columns; ++i) {
+                for(int i = 0; i != columns; ++i) {
                     describe ~= Describe();
                     auto d = &describe.back();
 
@@ -342,7 +343,7 @@ private struct Driver(Policy) {
 
                 bind.reserve(columns);
 
-                for(int i = 0; i < columns; ++i) {
+                for(int i = 0; i != columns; ++i) {
                     auto d = &describe[i];
                     bind ~= Bind();
                     auto b = &bind.back();
@@ -378,21 +379,25 @@ private struct Driver(Policy) {
                     //rows_ = row_count_;
                     return 0;
                 } else if (status == MYSQL_DATA_TRUNCATED) {
-                    createError("mysql_stmt_fetch: truncation", status);
+                    raiseError("mysql_stmt_fetch: truncation", status);
                 }
 
-                createError("mysql_stmt_fetch", stmt.stmt, status);
+                raiseError("mysql_stmt_fetch", stmt.stmt, status);
                 return 0;
             }
 
             // value getters
 
             /*
-            char[] get(X:char[])(Bind *b) {
-                auto ptr = cast(char*) b.data.ptr;
-                return ptr[0..b.length];
+               char[] get(X:char[])(Bind *b) {
+               auto ptr = cast(char*) b.data.ptr;
+               return ptr[0..b.length];
+               }
+             */
+
+            auto name(size_t idx) {
+                return describe[idx].name;
             }
-            */
 
             auto get(X:string)(Cell* cell) {
                 //return cast(string) get!(char[])(b);
@@ -505,7 +510,6 @@ private struct Driver(Policy) {
             string sql;
             Allocator allocator;
             MYSQL_STMT *stmt;
-            bool hasRows;
             uint binds;
             Array!Bind inputBind;
             Array!MYSQL_BIND mysqlBind;
@@ -557,6 +561,8 @@ private struct Driver(Policy) {
                 bindAll(args);
                 query();
             }
+
+            bool hasRows() {return true;}
 
             void reset() {
             }
@@ -632,7 +638,6 @@ private struct Driver(Policy) {
                 //allocator = stmt.allocator;
 
                 result_metadata = mysql_stmt_result_metadata(stmt.stmt);
-                if (!hasResult) return;
                 //columns = mysql_num_fields(result_metadata);
 
                 build_describe();
@@ -698,8 +703,6 @@ private struct Driver(Policy) {
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
 
-            bool hasResult() {return result_metadata != null;}
-
             int fetch() {
                 status = check("mysql_stmt_fetch", stmt.stmt, mysql_stmt_fetch(stmt.stmt));
                 if (!status) {
@@ -708,14 +711,18 @@ private struct Driver(Policy) {
                     //rows_ = row_count_;
                     return 0;
                 } else if (status == MYSQL_DATA_TRUNCATED) {
-                    createError("mysql_stmt_fetch: truncation", status);
+                    raiseError("mysql_stmt_fetch: truncation", status);
                 }
 
-                createError("mysql_stmt_fetch", stmt.stmt, status);
+                raiseError("mysql_stmt_fetch", stmt.stmt, status);
                 return 0;
             }
 
             // value getters
+
+            auto name(size_t idx) {
+                return describe[idx].name;
+            }
 
             char[] get(X:char[])(Bind *b) {
                 auto ptr = cast(char*) b.data.ptr;

@@ -223,8 +223,6 @@ struct Driver(Policy) {
 
         //~this() {}
 
-        bool hasResult() {return columns != 0;}
-
         bool hasRows() {return stmt_.hasRows;}
 
         int fetch() {
@@ -236,6 +234,12 @@ struct Driver(Policy) {
             }
             //throw new DatabaseException("sqlite3_step error: status: " ~ to!string(status_));
             throw new DatabaseException("sqlite3_step error: status: ");
+        }
+
+        auto name(size_t idx) {
+            import core.stdc.string: strlen;
+            auto ptr = sqlite3_column_name(st_, cast(int) idx);
+            return cast(string) ptr[0..strlen(ptr)];
         }
 
         auto get(X:string)(Cell* cell) {

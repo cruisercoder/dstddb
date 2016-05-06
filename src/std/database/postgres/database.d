@@ -259,6 +259,8 @@ struct Driver(Policy) {
                     resultForamt);
         }
 
+        bool hasRows() {return true;}
+
         int binds() {return cast(int) bindValue.length;} // fix
 
         void bind(string v) {
@@ -331,6 +333,7 @@ struct Driver(Policy) {
     struct Describe {
         int dbType;
         int fmt;
+        string name;
     }
 
 
@@ -361,9 +364,8 @@ struct Driver(Policy) {
             con = stmt.con;
             res = stmt.res;
 
-            hasResult_ = setup();
-            if (!hasResult()) return;
-            
+            setup();
+
             build_describe();
             build_bind();
         }
@@ -394,6 +396,7 @@ struct Driver(Policy) {
 
 
         void build_describe() {
+            import std.conv;
             // called after next()
             columns = PQnfields(res);
             for (int col = 0; col != columns; col++) {
@@ -401,6 +404,7 @@ struct Driver(Policy) {
                 auto d = &describe.back();
                 d.dbType = cast(int) PQftype(res, col);
                 d.fmt = PQfformat(res, col);
+                d.name = to!string(PQfname(res, col));
             }
         }
 
@@ -421,8 +425,6 @@ struct Driver(Policy) {
                 }
             }
         }
-
-        bool hasResult() {return hasResult_;}
 
         int fetch() {
             return ++row != rows ? 1 :0;
@@ -476,6 +478,10 @@ struct Driver(Policy) {
            return ptr[0..b.length];
            }
          */
+
+        auto name(size_t idx) {
+            return describe[idx].name;
+        }
 
         auto get(X:string)(Cell* cell) {
             checkType(type(cell.bind.idx),VARCHAROID);
