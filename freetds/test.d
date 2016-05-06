@@ -34,7 +34,7 @@ void example() {
     auto db = createDatabase("freetds://10.211.55.3:1433/test?username=sa&password=admin");
     auto rows = db.query("SELECT 1,2,'abc'").rows;
     foreach (r; rows) {
-        for(int c = 0; c != r.columns; ++c) writeln("column: ",c,", value: ",r[c].as!string);
+        for(int c = 0; c != r.width; ++c) writeln("column: ",c,", value: ",r[c].as!string);
     }
 }
 

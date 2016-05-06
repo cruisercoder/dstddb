@@ -501,13 +501,11 @@ struct BasicRow(D,P) {
     auto opIndex(Column column) {return opIndex(column.idx);}
 
     Value opIndex(size_t idx) {
-        auto result = rows_.result_;
+        auto result = &rows_.result_;
         // needs work
         // sending a ptr to cell instead of reference (dangerous)
-        auto cell = Cell(&result, &result.data_.bind[idx]);
-        return Value(
-                &result,
-                cell);
+        auto cell = Cell(result, &result.data_.bind[idx]);
+        return Value(result, cell);
     }
 }
 
