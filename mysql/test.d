@@ -10,15 +10,26 @@ unittest {
     import std.database.testsuite;
     alias DB = Database!DefaultPolicy;
     testAll!DB("mysql");
+
+    //negativeNotExecuteTest();
+}
+
+
+void negativeNotExecuteTest() {
+    auto db = createDatabase("mysql://127.0.0.1/test");
+    auto con = db.connection();
+    //con.statement("select * from score").writeRows;
+    con.statement("select * from score").writeRows;
 }
 
 unittest {
     //perf1();
-    //con.query("select * from tuple").writeResult();
+    //con.query("select * from tuple").writeRows;
 }
 
 //auto db = createDatabase("mysql://127.0.0.1/test");
 
+/*
 void perf1() {
     import std.datetime;
     import std.conv;
@@ -59,4 +70,4 @@ void perf1() {
     writeln("sum: ", sum);
     writeln("time: ", to!Duration(sw2.peek));
 }
-
+*/

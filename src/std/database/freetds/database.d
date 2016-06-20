@@ -14,22 +14,23 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver!Policy,Policy);
 
     private static bool isError(RETCODE ret) {
         return 
@@ -54,9 +55,11 @@ struct Impl(Policy) {
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        bool bindable() {return false;}
-        bool dateBinding() {return false;}
-        bool poolEnable() {return false;}
+        static const FeatureArray features = [
+            //Feature.InputBinding,
+            //Feature.DateBinding,
+            //Feature.ConnectionPool,
+            ];
 
         Allocator allocator;
 
@@ -124,7 +127,7 @@ struct Impl(Policy) {
             db = db_;
             source = source_;
 
-            info("Connection: ");
+            //info("Connection: ");
 
             login = check("dblogin", dblogin());
 
@@ -150,7 +153,7 @@ struct Impl(Policy) {
         }
 
         ~this() {
-            info("~Connection: ", source);
+            //info("~Connection: ", source);
             if (con) dbclose(con);
             if (login) dbloginfree(login);
         }
@@ -187,6 +190,9 @@ struct Impl(Policy) {
             bindAll(args);
             query();
         }
+
+        //bool hasRows() {return status != NO_MORE_RESULTS;}
+        bool hasRows() {return true;}
 
         private void bindAll(T...) (T args) {
             //int col;
@@ -235,21 +241,13 @@ struct Impl(Policy) {
         private auto con() {return stmt.con;}
         private auto dbproc() {return con.con;}
 
-        this(Statement* stmt_) {
+        this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
             allocator = stmt.allocator;
-
             status = check("dbresults", dbresults(dbproc));
-            if (status == NO_MORE_RESULTS) return;
-
             columns = dbnumcols(dbproc);
-            info("COLUMNS:", columns);
-
-            //if (!columns) return;
-
             build_describe();
             build_bind();
-            next();
         }
 
         ~this() {
@@ -292,6 +290,12 @@ struct Impl(Policy) {
                         allocSize = b.size+1;
                         b.bindType = NTBSTRINGBIND;
                         break;
+                    case SYBMSDATE:
+                        b.type = ValueType.Date;
+                        b.size = DBDATETIME.sizeof;
+                        allocSize = b.size;
+                        b.bindType = DATETIMEBIND;
+                        break;
                     default: 
                         b.type = ValueType.String;
                         b.size = 255;
@@ -320,35 +324,40 @@ struct Impl(Policy) {
             }
         }
 
-        bool start() {return status == REG_ROW;}
-
-        bool next() {
+        int fetch() {
             status = check("dbnextrow", dbnextrow(dbproc));
             if (status == REG_ROW) {
-                return true; 
+                return 1; 
             } else if (status == NO_MORE_ROWS) {
                 stmt.reset();
-                return false;
+                return 0;
             }
-            return false;
+            return 0;
         }
 
-        auto get(X:string)(Bind *b) {
+        auto name(size_t idx) {
+            return to!string(describe[idx].name);
+        }
+
+        auto get(X:string)(Cell* cell) {
             import core.stdc.string: strlen;
-            checkType(b.bindType, NTBSTRINGBIND);
-            auto ptr = cast(immutable char*) b.data.ptr;
+            checkType(cell.bind.bindType, NTBSTRINGBIND);
+            auto ptr = cast(immutable char*) cell.bind.data.ptr;
             return cast(string) ptr[0..strlen(ptr)];
         }
 
-        auto get(X:int)(Bind *b) {
+        auto get(X:int)(Cell* cell) {
             //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
             //checkType(b.bindType, SQL_C_LONG);
             //return *(cast(int*) b.data);
             return 0;
         }
 
-        auto get(X:Date)(Bind *b) {
-            return Date(2016,1,1); // fix
+        auto get(X:Date)(Cell* cell) {
+            auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
+            DBDATEREC d;
+            check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
+            return Date(d.year, d.month, d.day);
         }
 
         void checkType(int a, int b) {

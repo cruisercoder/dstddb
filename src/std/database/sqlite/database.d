@@ -13,7 +13,7 @@ import std.database.source;
 import std.database.allocator;
 import std.database.pool;
 import std.experimental.logger;
-import std.database.impl;
+import std.database.front;
 
 import std.container.array;
 import std.datetime;
@@ -24,7 +24,7 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -34,24 +34,18 @@ auto createDatabase(T)(string defaultURI="") {
     return Database!T(defaultURI);  
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver,Policy);
 
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        bool bindable() {return true;}
-        bool dateBinding() {return false;}
-        bool poolEnable() {return false;}
-
-        // properties? 
-
-        /*
-           string defaultSource() {
-           version (assert) if (!refCountedStore.isInitialized) throw new DatabaseException("uninitialized");
-           return defaultSource;
-           }
-         */
+        static const FeatureArray features = [
+            Feature.InputBinding,
+            //Feature.DateBinding,
+            //Feature.ConnectionPool,
+            ];
 
         this(string defaultSource_) {
         }
@@ -212,7 +206,7 @@ struct Impl(Policy) {
         // artifical bind array (for now)
         Array!Bind bind;
 
-        this(Statement* stmt) {
+        this(Statement* stmt, int rowArraySize_) {
             stmt_ = stmt;
             st_ = stmt_.st;
             columns = sqlite3_column_count(st_);
@@ -229,30 +223,36 @@ struct Impl(Policy) {
 
         //~this() {}
 
-        bool start() {return stmt_.hasRows;}
+        bool hasRows() {return stmt_.hasRows;}
 
-        bool next() {
+        int fetch() {
             status_ = sqlite3_step(st_);
-            if (status_ == SQLITE_ROW) return true;
+            if (status_ == SQLITE_ROW) return 1;
             if (status_ == SQLITE_DONE) {
                 stmt_.reset();
-                return false;
+                return 0;
             }
             //throw new DatabaseException("sqlite3_step error: status: " ~ to!string(status_));
             throw new DatabaseException("sqlite3_step error: status: ");
         }
 
-        auto get(X:string)(Bind *b) {
+        auto name(size_t idx) {
             import core.stdc.string: strlen;
-            auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) b.idx);
+            auto ptr = sqlite3_column_name(st_, cast(int) idx);
+            return cast(string) ptr[0..strlen(ptr)];
+        }
+
+        auto get(X:string)(Cell* cell) {
+            import core.stdc.string: strlen;
+            auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) cell.bind.idx);
             return cast(string) ptr[0..strlen(ptr)]; // fix with length
         }
 
-        auto get(X:int)(Bind *b) {
-            return sqlite3_column_int(st_, cast(int) b.idx);
+        auto get(X:int)(Cell* cell) {
+            return sqlite3_column_int(st_, cast(int) cell.bind.idx);
         }
 
-        auto get(X:Date)(Bind *b) {
+        auto get(X:Date)(Cell* cell) {
             return Date(2016,1,1); // fix
         }
 

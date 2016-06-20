@@ -16,7 +16,7 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 
 //alias long SQLLEN;
@@ -29,21 +29,24 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver,Policy);
 
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        bool bindable() {return false;}
-        bool dateBinding() {return false;}
-        bool poolEnable() {return true;}
+        static const FeatureArray features = [
+            //Feature.InputBinding,
+            //Feature.DateBinding,
+            Feature.ConnectionPool,
+            ];
 
         Allocator allocator;
         SQLHENV env;
@@ -140,7 +143,7 @@ struct Impl(Policy) {
         string sql;
         Allocator *allocator;
         SQLHSTMT stmt;
-        bool hasRows; // not working
+        bool hasRows_; // not working
         int binds;
         Array!Bind inputbind_;
 
@@ -234,12 +237,12 @@ struct Impl(Policy) {
                         cast(SQLCHAR*) toStringz(sql),
                         SQL_NTS);
                 check("SQLExecuteDirect()", SQL_HANDLE_STMT, stmt, ret);
-                hasRows = ret != SQL_NO_DATA;
+                hasRows_ = ret != SQL_NO_DATA;
             } else {
                 info("sql execute prepared: ", sql);
                 SQLRETURN ret = SQLExecute(stmt);
                 check("SQLExecute()", SQL_HANDLE_STMT, stmt, ret);
-                hasRows = ret != SQL_NO_DATA;
+                hasRows_ = ret != SQL_NO_DATA;
             }
         }
 
@@ -247,6 +250,8 @@ struct Impl(Policy) {
             bindAll(args);
             query();
         }
+
+        bool hasRows() {return hasRows_;}
 
         void exec() {
             check("SQLExecDirect", SQLExecDirect(stmt,cast(SQLCHAR*) toStringz(sql), SQL_NTS));
@@ -308,7 +313,7 @@ struct Impl(Policy) {
         Array!Bind bind;
         SQLRETURN status;
 
-        this(Statement* stmt_) {
+        this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
             allocator = stmt.allocator;
 
@@ -317,12 +322,8 @@ struct Impl(Policy) {
             SQLSMALLINT v;
             check("SQLNumResultCols", SQLNumResultCols (stmt.stmt, &v));
             columns = v;
-
-            if (!columns) return;
-
             build_describe();
             build_bind();
-            next();
         }
 
         ~this() {
@@ -400,34 +401,37 @@ struct Impl(Policy) {
             }
         }
 
-        bool start() {return status == SQL_SUCCESS;}
-
-        bool next() {
+        int fetch() {
             //info("SQLFetch");
             status = SQLFetch(stmt.stmt);
             if (status == SQL_SUCCESS) {
-                return true; 
+                return 1; 
             } else if (status == SQL_NO_DATA) {
                 stmt.reset();
-                return false;
+                return 0;
             }
             check("SQLFetch", SQL_HANDLE_STMT, stmt.stmt, status);
-            return false;
+            return 0;
         }
 
-        auto get(X:string)(Bind *b) {
-            checkType(b.bindType, SQL_C_CHAR);
-            auto ptr = cast(immutable char*) b.data;
-            return cast(string) ptr[0..b.len];
+        auto name(size_t idx) {
+            auto d = &describe[idx];
+            return cast(string) d.name[0..d.nameLen];
         }
 
-        auto get(X:int)(Bind *b) {
+        auto get(X:string)(Cell* cell) {
+            checkType(cell.bind.bindType, SQL_C_CHAR);
+            auto ptr = cast(immutable char*) cell.bind.data;
+            return cast(string) ptr[0..cell.bind.len];
+        }
+
+        auto get(X:int)(Cell* cell) {
             //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
-            checkType(b.bindType, SQL_C_LONG);
-            return *(cast(int*) b.data);
+            checkType(cell.bind.bindType, SQL_C_LONG);
+            return *(cast(int*) cell.bind.data);
         }
 
-        auto get(X:Date)(Bind *b) {
+        auto get(X:Date)(Cell* cell) {
             return Date(2016,1,1); // fix
         }
 

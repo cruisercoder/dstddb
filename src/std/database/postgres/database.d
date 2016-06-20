@@ -12,7 +12,7 @@ import std.database.source;
 import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
-import std.database.impl;
+import std.database.front;
 
 import std.stdio;
 import std.typecons;
@@ -23,7 +23,7 @@ struct DefaultPolicy {
     static const bool nonblocking = false;
 }
 
-alias Database(T) = BasicDatabase!(Impl!T,T);
+alias Database(T) = BasicDatabase!(Driver!T,T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -64,11 +64,18 @@ int checkForZero()(PGconn *con, string msg, int result) {
     return result;
 }
 
-struct Impl(Policy) {
+struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
+    alias Cell = BasicCell!(Driver,Policy);
 
     struct Database {
         static const auto queryVariableType = QueryVariableType.Dollar;
+
+        static const FeatureArray features = [
+            Feature.InputBinding,
+            Feature.DateBinding,
+            //Feature.ConnectionPool,
+            ];
 
         Allocator allocator;
 
@@ -78,10 +85,6 @@ struct Impl(Policy) {
 
         ~this() {
         }
-
-        bool bindable() {return true;}
-        bool dateBinding() {return true;}
-        bool poolEnable() {return false;}
     }
 
     struct Connection {
@@ -256,6 +259,8 @@ struct Impl(Policy) {
                     resultForamt);
         }
 
+        bool hasRows() {return true;}
+
         int binds() {return cast(int) bindValue.length;} // fix
 
         void bind(string v) {
@@ -328,6 +333,7 @@ struct Impl(Policy) {
     struct Describe {
         int dbType;
         int fmt;
+        string name;
     }
 
 
@@ -348,16 +354,18 @@ struct Impl(Policy) {
         ExecStatusType status;
         int row;
         int rows;
+        bool hasResult_;
 
         // artifical bind array (for now)
         Array!Bind bind;
 
-        this(Statement* stmt_) {
+        this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
             con = stmt.con;
             res = stmt.res;
 
-            if (!setup()) return;
+            setup();
+
             build_describe();
             build_bind();
         }
@@ -388,6 +396,7 @@ struct Impl(Policy) {
 
 
         void build_describe() {
+            import std.conv;
             // called after next()
             columns = PQnfields(res);
             for (int col = 0; col != columns; col++) {
@@ -395,6 +404,7 @@ struct Impl(Policy) {
                 auto d = &describe.back();
                 d.dbType = cast(int) PQftype(res, col);
                 d.fmt = PQfformat(res, col);
+                d.name = to!string(PQfname(res, col));
             }
         }
 
@@ -416,11 +426,8 @@ struct Impl(Policy) {
             }
         }
 
-        //bool start() {return data_.status == PGRES_SINGLE_TUPLE;}
-        bool start() {return row != rows;}
-
-        bool next() {
-            return ++row != rows;
+        int fetch() {
+            return ++row != rows ? 1 :0;
         }
 
         bool singleRownext() {
@@ -472,24 +479,28 @@ struct Impl(Policy) {
            }
          */
 
-        auto get(X:string)(Bind *b) {
-            checkType(type(b.idx),VARCHAROID);
-            immutable char *ptr = cast(immutable char*) data(b.idx);
-            return cast(string) ptr[0..len(b.idx)];
+        auto name(size_t idx) {
+            return describe[idx].name;
         }
 
-        auto get(X:int)(Bind *b) {
+        auto get(X:string)(Cell* cell) {
+            checkType(type(cell.bind.idx),VARCHAROID);
+            immutable char *ptr = cast(immutable char*) data(cell.bind.idx);
+            return cast(string) ptr[0..len(cell.bind.idx)];
+        }
+
+        auto get(X:int)(Cell* cell) {
             import std.bitmanip;
-            checkType(type(b.idx),INT4OID);
-            auto p = cast(ubyte*) data(b.idx);
+            checkType(type(cell.bind.idx),INT4OID);
+            auto p = cast(ubyte*) data(cell.bind.idx);
             return bigEndianToNative!int(p[0..int.sizeof]);
         }
 
-        auto get(X:Date)(Bind *b) {
+        auto get(X:Date)(Cell* cell) {
             import std.bitmanip;
-            checkType(type(b.idx),DATEOID);
-            auto ptr = cast(ubyte*) data(b.idx);
-            int sz = len(b.idx);
+            checkType(type(cell.bind.idx),DATEOID);
+            auto ptr = cast(ubyte*) data(cell.bind.idx);
+            int sz = len(cell.bind.idx);
             date d = bigEndianToNative!uint(ptr[0..4]); // why not sz?
             int[3] mdy;
             PGTYPESdate_julmdy(d, &mdy[0]);

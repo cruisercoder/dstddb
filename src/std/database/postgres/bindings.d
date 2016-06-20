@@ -104,6 +104,7 @@ extern(System) {
 
     Oid PQftype(const PGresult *res, int column_number);
     int PQfformat(const PGresult *res, int field_num);
+    char *PQfname(const PGresult *res, int field_num);
 
     void PQclear(PGresult *res);
 

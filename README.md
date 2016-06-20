@@ -35,9 +35,8 @@ import std.database.mysql;
 auto db = createDatabase("mysql://127.0.0.1/test");
 auto con = db.connection();
 auto stmt = con.statement("select * from table");
-auto rowSet = stmt.query();
-auto range = stmt[];
-foreach (row; range) {
+auto rows = stmt.query.rows;
+foreach (row; rows) {
     for(size_t col = 0; col != row.columns; ++col) write(rowr[col]), " ");
     writeln();
 }
@@ -47,20 +46,19 @@ foreach (row; range) {
 ```D
 import std.database.sqlite;
 createDatabase("file:///demo.sqlite")
-.connection()
+    .connection
     .query("select * from t1")
-    .writeResult();
-    ```
+    .writeRows;
+```
 
 #### field access
-    ```D
-    import std.database.sqlite;
-    auto db = createDatabase("file:///testdb");
-    auto rowSet = db.connection().query("select name,score from score");
-    foreach (r; rowSet) {
-        writeln(r[0].as!string,",",r[1].as!int);
-    }
-
+```D
+import std.database.sqlite;
+auto db = createDatabase("file:///testdb");
+auto rows = db.connection.query("select name,score from score").rows;
+foreach (r; rows) {
+    writeln(r[0].as!string,",",r[1].as!int);
+}
 ```
 
 #### select with input binding
@@ -68,30 +66,30 @@ createDatabase("file:///demo.sqlite")
 import std.database.sqlite;
 int minScore = 50;
 createDatabase("file:///demo.sqlite")
-.connection()
+    .connection
     .query("select * from t1 where score >= ?", minScore)
-    .writeResult();
-    ```
+    .writeRows;
+```
 
 #### insert with input binding
-    ```D
-    import std.database;
-    auto db = createDatabase("mydb");
-    auto con = db.connection();
-    auto stmt = con.statement("insert into table values(?,?)");
-    stmt.query("a",1);
-    stmt.query("b",2);
-    stmt.query("c",3);
-    ```
+```D
+import std.database;
+auto db = createDatabase("mydb");
+auto con = db.connection();
+auto stmt = con.statement("insert into table values(?,?)");
+stmt.query("a",1);
+stmt.query("b",2);
+stmt.query("c",3);
+```
 
 #### poly database setup (driver registration)
-    ```D
-    import std.database.poly;
-    Database.register!(std.database.sqlite.Database)();
-    Database.register!(std.database.mysql.Database)();
-    Database.register!(std.database.oracle.Database)();
-    auto db = createDatabase("mydb");
-    ```
+```D
+import std.database.poly;
+Database.register!(std.database.sqlite.Database)();
+Database.register!(std.database.mysql.Database)();
+Database.register!(std.database.oracle.Database)();
+auto db = createDatabase("mydb");
+```
 
 ### Notes
 

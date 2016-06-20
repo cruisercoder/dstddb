@@ -1,10 +1,11 @@
 module std.database.rowset;
-import std.database.impl;
+import std.database.front;
 import std.datetime;
 import std.container.array;
 
 // experimental detached rowset
 
+/*
 struct RowSet {
     private struct RowData {
         int[3] data;
@@ -25,12 +26,13 @@ struct RowSet {
         void *data;
     }
 
-    struct Impl {
+    struct Driver {
         alias Result = .RowSet;
         alias Bind = RowSet.Bind;
     }
+    struct Policy {}
 
-    alias Converter = .Converter!Impl;
+    alias Converter = .Converter!(Driver,Policy);
 
 
     struct TypeInfo(T:int) {static int type() {return ValueType.Int;}}
@@ -79,5 +81,5 @@ struct RowSet {
     private Array!RowData data;
 }
 
-
+*/
 

@@ -5,6 +5,9 @@ enum OCI_SUCCESS = 0;
 enum OCI_SUCCESS_WITH_INFO = 1;
 enum OCI_NO_DATA = 100;
 
+enum OCI_ATTR_PREFETCH_ROWS = 13;
+enum OCI_ATTR_ROWS_FETCHED = 197;
+
 enum OCI_THREADED = 0x00000001;
 enum OCI_OBJECT = 0x00000002;
 
@@ -55,11 +58,47 @@ enum OCI_STMT_CALL = 10;
 enum OCI_DTYPE_PARAM = 53;
 
 // from ocidfn.h
-enum SQLT_INT = 3;
-enum SQLT_STR = 5;
-enum SQLT_DAT = 12;
 
-enum SQLT_ODT = 156;
+enum SQLT_CHR = 1;                        /* (ORANET TYPE) character string */
+enum SQLT_NUM = 2;                          /* (ORANET TYPE) oracle numeric */
+enum SQLT_INT = 3;                                 /* (ORANET TYPE) integer */
+enum SQLT_FLT = 4;                   /* (ORANET TYPE) Floating point number */
+enum SQLT_STR = 5;                                /* zero terminated string */
+enum SQLT_VNU = 6;                        /* NUM with preceding length byte */
+enum SQLT_PDN = 7;                  /* (ORANET TYPE) Packed Decimal Numeric */
+enum SQLT_LNG = 8;                                                  /* long */
+enum SQLT_VCS = 9;                             /* Variable character string */
+enum SQLT_NON = 10;                      /* Null/empty PCC Descriptor entry */
+enum SQLT_RID = 11;                                                /* rowid */
+enum SQLT_DAT = 12;                                /* date in oracle format */
+enum SQLT_VBI = 15;                                 /* binary in VCS format */
+enum SQLT_BFLOAT = 21;                                /* Native Binary float*/
+enum SQLT_BDOUBLE = 22;                             /* NAtive binary double */
+enum SQLT_BIN = 23;                                  /* binary data(DTYBIN) */
+enum SQLT_LBI = 24;                                          /* long binary */
+enum SQLT_UIN = 68;                                     /* unsigned integer */
+enum SQLT_SLS = 91;                        /* Display sign leading separate */
+enum SQLT_LVC = 94;                                  /* Longer longs (char) */
+enum SQLT_LVB = 95;                                   /* Longer long binary */
+enum SQLT_AFC = 96;                                      /* Ansi fixed char */
+enum SQLT_AVC = 97;                                        /* Ansi Var char */
+enum SQLT_IBFLOAT = 100;                          /* binary float canonical */
+enum SQLT_IBDOUBLE = 101;                         /* binary double canonical */
+enum SQLT_CUR = 102;                                        /* cursor  type */
+enum SQLT_RDD = 104;                                    /* rowid descriptor */
+enum SQLT_LAB = 105;                                          /* label type */
+enum SQLT_OSL = 106;                                        /* oslabel type */
+
+enum SQLT_NTY = 108;                                   /* named object type */
+enum SQLT_REF = 110;                                            /* ref type */
+enum SQLT_CLOB= 112;                                       /* character lob */
+enum SQLT_BLOB = 113;                                          /* binary lob */
+enum SQLT_BFILEE = 114;                                   /* binary file lob */
+enum SQLT_CFILEE = 115;                                /* character file lob */
+enum SQLT_RSET = 116;                                     /* result set type */
+enum SQLT_NCO = 122;      /* named collection type (varray or nested table) */
+enum SQLT_VST =  155;                                      /* OCIString type */
+enum SQLT_ODT = 156;                                        /* OCIDate type */
 
 extern(System) {
     /* typedef */ alias void* dvoid;
@@ -117,12 +156,23 @@ extern(System) {
             void  *attributep, ub4 *sizep, ub4 attrtype, 
             OCIError *errhp);
 
+    sword OCIAttrSet (void  *trgthndlp, ub4 trghndltyp, void  *attributep,
+                    ub4 size, ub4 attrtype, OCIError *errhp);
+
     sword OCIParamGet (const void  *hndlp, ub4 htype, OCIError *errhp, 
             void  **parmdpp, ub4 pos);
 
     sword OCIDefineByPos (OCIStmt *stmtp, OCIDefine **defnp, OCIError *errhp,
             ub4 position, void  *valuep, sb4 value_sz, ub2 dty,
             void  *indp, ub2 *rlenp, ub2 *rcodep, ub4 mode);
+
+    sword OCIDefineArrayOfStruct(
+            OCIDefine *defnp,
+            OCIError *errhp,
+            ub4 pvskip,
+            ub4 indskip,
+            ub4 rlskip,
+            ub4 rcskip);
 
     sword OCIDateTimeGetDate(void *hndl, OCIError *err,  const OCIDateTime *date,
             sb2 *year, ub1 *month, ub1 *day );

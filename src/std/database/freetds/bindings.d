@@ -69,12 +69,53 @@ extern(System) {
         SYBFLTN = 109,
         SYBMONEYN = 110,
         SYBDATETIMN = 111,
-        SYBNVARCHAR = 103
+        SYBNVARCHAR = 103,
+
+        SYBMSDATE = 40
     };
 
     enum {
         NTBSTRINGBIND = 2,
+        DATETIMEBIND = 11
     }
+
+    struct DBDATETIME {
+        DBINT dtdays;
+        DBINT dttime;
+    }
+
+    struct tds_microsoft_dbdaterec {
+        DBINT year;     /* 1753 - 9999         */
+        DBINT quarter;      /* 1 - 4           */
+        DBINT month;        /* 1 - 12          */
+        DBINT day;      /* 1 - 31          */
+        DBINT dayofyear;    /* 1 - 366         */
+        DBINT week;             /* 1 - 54 (for leap years) */
+        DBINT weekday;      /* 1 - 7 (Mon. - Sun.)     */
+        DBINT hour;     /* 0 - 23          */
+        DBINT minute;       /* 0 - 59          */
+        DBINT second;       /* 0 - 59          */
+        DBINT millisecond;  /* 0 - 999         */
+        DBINT tzone;        /* -840 - 840          */
+    };
+
+    struct tds_microsoft_dbdaterec2 {
+        DBINT year;		/* 1753 - 9999  	   */
+        DBINT quarter;		/* 1 - 4 		   */
+        DBINT month;		/* 1 - 12 		   */
+        DBINT day;		/* 1 - 31 		   */
+        DBINT dayofyear;	/* 1 - 366 		   */
+        DBINT week;            	/* 1 - 54 (for leap years) */
+        DBINT weekday;		/* 1 - 7 (Mon. - Sun.)     */
+        DBINT hour;		/* 0 - 23 		   */
+        DBINT minute;		/* 0 - 59 		   */
+        DBINT second;		/* 0 - 59 		   */
+        DBINT nanosecond;	/* 0 - 999999999	   */
+        DBINT tzone;		/* 0 - 127  (Sybase only)  */
+    };
+
+    alias tds_microsoft_dbdaterec  DBDATEREC;
+    alias tds_microsoft_dbdaterec2 DBDATEREC2;
 
     RETCODE dbinit();
     void dbexit();
@@ -127,6 +168,10 @@ extern(System) {
     RETCODE dbnullbind(DBPROCESS * dbproc, int column, DBINT * indicator);
 
     STATUS dbnextrow(DBPROCESS * dbproc);
+
+    // date functions
+    RETCODE dbdatecrack(DBPROCESS * dbproc, DBDATEREC * di, DBDATETIME * dt);
+    RETCODE dbanydatecrack(DBPROCESS * dbproc, DBDATEREC2 * di, int type, const void *data);
 
     // tds functions (from tds.h), not accessible from dblib :)
     alias ubyte TDS_TINYINT;

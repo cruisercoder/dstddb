@@ -51,8 +51,8 @@ void vibeTest() {
     auto con = db.connection();
     //auto c = cast(PGconn*) c.handle();
 
-    auto r = con.query("select name from score");
-    writeResult(r);
+    auto rows = con.query("select name from score").rows;
+    rows.writeRows;
 
 /*
     Socket sock = toSocket(posixSocket(con));
