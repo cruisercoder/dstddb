@@ -37,7 +37,7 @@ auto con = db.connection();
 auto stmt = con.statement("select * from table");
 auto rows = stmt.query.rows;
 foreach (row; rows) {
-    for(size_t col = 0; col != row.columns; ++col) write(rowr[col]), " ");
+    for(size_t col = 0; col != row.width; ++col) write(row[col], " ");
     writeln();
 }
 
