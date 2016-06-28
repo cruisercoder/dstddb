@@ -268,6 +268,7 @@ struct BasicStatement(D,P) {
 
     auto into(A...) (ref A args) {
         if (state != State.Executed) throw new DatabaseException("not executed");
+        rows.into(args);
         return this;
     }
 
@@ -424,11 +425,9 @@ struct BasicRowSet(D,P) {
     void rowSetTag();
 
     private Result result_;
-    private bool ok_;
 
     this(Result result) {
         result_ = result;
-        ok_ = result.rowsFetched != 0;
     }
 
     int width() {return result_.data_.columns;}
@@ -440,7 +439,6 @@ struct BasicRowSet(D,P) {
 
     auto into(A...) (ref A args) {
         if (!result_.rowsFetched()) throw new DatabaseException("no data");
-
         auto row = front();
         foreach(i, ref a; args) {
             alias T = A[i];
@@ -482,9 +480,9 @@ struct BasicRowSet(D,P) {
     }
 
 
-    bool empty() {return !ok_;}
+    bool empty() {return result_.rowsFetched_ == 0;}
     auto front() {return Row(this);}
-    void popFront() {ok_ = result_.next();}
+    void popFront() {result_.next();}
 }
 
 struct BasicRow(D,P) {
