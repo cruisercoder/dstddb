@@ -34,6 +34,8 @@ enum ValueType {
     Int,
     String,
     Date,
+	DateTime,
+	Double,
     Variant,
 }
 
