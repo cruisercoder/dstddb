@@ -621,6 +621,14 @@ struct Driver(Policy) {
         //return 0;
     }
 
+	ubyte[] rawData(Cell* cell) { //TODO: fix
+			return null;
+		//auto ptr = cast(ubyte*) data(cell);
+		//return ptr[0..strlen(ptr)];
+	}
+
+	bool isNull(Cell* cell){return false;}
+
     auto get(X:string)(Cell* cell) {
         import core.stdc.string: strlen;
         checkType(cell.bind.oType, SQLT_STR);

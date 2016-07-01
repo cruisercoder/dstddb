@@ -242,6 +242,12 @@ struct Driver(Policy) {
             return cast(string) ptr[0..strlen(ptr)];
         }
 
+		ubyte[] rawData(Cell* cell) {
+			return null; //TODO: fix
+		}
+
+		bool isNull(Cell* cell){return false;}
+
         auto get(X:string)(Cell* cell) {
             import core.stdc.string: strlen;
             auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) cell.bind.idx);

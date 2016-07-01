@@ -419,6 +419,13 @@ struct Driver(Policy) {
             return cast(string) d.name[0..d.nameLen];
         }
 
+		ubyte[] rawData(Cell* cell) { 
+			auto ptr = cast(ubyte*) cell.bind.data;
+			return ptr[0..cell.bind.len];
+		}
+
+		bool isNull(Cell* cell){return false;}
+
         auto get(X:string)(Cell* cell) {
             checkType(cell.bind.bindType, SQL_C_CHAR);
             auto ptr = cast(immutable char*) cell.bind.data;

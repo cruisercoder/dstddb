@@ -16,6 +16,7 @@ import std.experimental.logger;
 public import std.database.allocator;
 import std.database.front;
 import std.datetime;
+import std.variant;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -338,6 +339,12 @@ struct Driver(Policy) {
         auto name(size_t idx) {
             return to!string(describe[idx].name);
         }
+
+		ubyte[] rawData(Cell* cell) { //TODO: fix
+			return null;
+		}
+
+		bool isNull(Cell* cell){return false;}
 
         auto get(X:string)(Cell* cell) {
             import core.stdc.string: strlen;

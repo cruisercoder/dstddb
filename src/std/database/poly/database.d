@@ -394,6 +394,12 @@ struct Driver(Policy) {
             return 0;
         }
 
+		ubyte[] rawData(Cell* cell) {
+			return null;
+		}
+
+		bool isNull(Cell* cell){return false;}
+
         auto name(size_t idx) {
             return "-name-";
         }

@@ -12,7 +12,7 @@ import std.database.source;
 import std.database.allocator;
 import std.traits;
 import std.container.array;
-import std.variant;
+public import std.variant;
 
 import std.range.primitives;
 import std.database.option;
@@ -29,14 +29,38 @@ public import std.database.array;
    (version_major == 2 && version_minor == 70));
  */
 
+struct Time
+{
+	this(uint h, uint m, uint s = 0, uint ms = 0)
+	{
+		hour = h; minute = m; second = s; msecond = ms;
+	}
+
+	uint hour;
+	uint minute;
+	uint second;
+	uint msecond;
+}
 
 enum ValueType {
-    Int,
-    String,
-    Date,
-	DateTime,
+	Char,
+
+    Short,
+	Int,
+	Long,
+
+	Float,
 	Double,
-    Variant,
+
+    String,
+
+    Date,
+	Time,
+	DateTime,
+
+    Raw,
+
+	Variant //TODO: remove
 }
 
 // improve
@@ -412,7 +436,7 @@ struct BasicColumn(D,P) {
     }
 
     auto idx() {return idx_;}
-    auto name() {return "abc";}
+	auto name() {return result_.data_.name(idx_);}
 
 }
 
@@ -520,8 +544,8 @@ struct BasicRow(D,P) {
         auto result = &rows_.result_;
         // needs work
         // sending a ptr to cell instead of reference (dangerous)
-        auto cell = Cell(result, &result.data_.bind[idx], idx);
-        return Value(result, cell);
+        //auto cell = Cell(result, &result.data_.bind[idx], idx);
+		return Value(Cell(result, &result.data_.bind[idx], idx));
     }
 }
 
@@ -533,20 +557,23 @@ struct BasicValue(D,P) {
     alias Result = BasicResult!(Driver,Policy);
     alias Cell = BasicCell!(Driver,Policy);
     alias Bind = Driver.Bind;
-    private Result* result_;
-    private Bind* bind_;
+  //  private Result* result_;
+  //  private Bind* bind_;
     private Cell cell_;
+	private Variant data_;
     alias Converter = .Converter!(Driver,Policy);
 
-    this(Result* result, Cell cell) {
-        result_ = result;
+    this(/*Result* result,*/ Cell cell) {
+       // result_ = result;
         //bind_ = bind;
         cell_ = cell;
     }
 
     private auto resultPtr() {
-        return &result_.result(); // last parens matter here (something about delegate)
+		auto r = cell_.result_;
+		return &(r.result()); // last parens matter here (something about delegate)
     }
+	ubyte[] rawData(){return resultPtr.rawData(&cell_);}
 
     auto type() {return cell_.bind.type;}
 
@@ -558,7 +585,7 @@ struct BasicValue(D,P) {
     // should be nothrow?
     auto as(T:Variant)() {return Converter.convert!T(resultPtr, cell_);}
 
-    bool isNull() {return false;} //fix
+	bool isNull() {return resultPtr.isNull(&cell_);} //fix
 
     string name() {return resultPtr.name(cell_.idx_);}
 
@@ -575,9 +602,10 @@ struct BasicValue(D,P) {
 }
 
 
+
 // extra stuff
 
-
+/*
 struct EfficientValue(T) {
     alias Driver = T.Driver;
     alias Bind = Driver.Bind;
@@ -592,22 +620,31 @@ struct EfficientValue(T) {
     auto as(T:Variant)() {return Converter.convertDirect!T(bind_);}
 
 }
-
+*/
 
 struct BasicCell(D,P) {
     alias Driver = D;
     alias Policy = P;
     alias Result = BasicResult!(Driver,Policy);
     alias Bind = Driver.Bind;
+	alias Value = BasicValue!(Driver,Policy);
     private Bind* bind_;
     private int rowIdx_;
     private size_t idx_;
+	private Result * result_;
 
     this(Result *r, Bind *b, size_t idx) {
         bind_ = b;
+		result_ = r;
         rowIdx_ = r.rowIdx_;
         idx_ = idx;
     }
+
+	private auto resultPtr() {
+		return &result_.result(); // last parens matter here (something about delegate)
+	}
+
+	auto value(){return Value(this);}
 
     auto bind() {return bind_;}
     auto rowIdx() {return rowIdx_;}

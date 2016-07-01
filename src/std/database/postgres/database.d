@@ -483,6 +483,14 @@ struct Driver(Policy) {
             return describe[idx].name;
         }
 
+		ubyte[] rawData(Cell* cell){
+			auto ptr = cast(ubyte*) data(cell.bind.idx);
+			return ptr[0..len(cell.bind.idx)];
+		}
+
+
+		bool isNull(Cell* cell){return false;}
+
         auto get(X:string)(Cell* cell) {
             checkType(type(cell.bind.idx),VARCHAROID);
             immutable char *ptr = cast(immutable char*) data(cell.bind.idx);
