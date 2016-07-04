@@ -424,23 +424,19 @@ struct Driver(Policy) {
 			return ptr[0..cell.bind.len];
 		}
 
+		Variant getValue(Cell* cell)
+		{
+			Variant = value;
+			if(cell.bind.type = ValueType.String)
+			{
+				auto ptr = cast(immutable char*) cell.bind.data;
+				value = cast(string) ptr[0..cell.bind.len];
+			}
+			return value; //TODO:
+		}
+
+
 		bool isNull(Cell* cell){return false;}
-
-        auto get(X:string)(Cell* cell) {
-            checkType(cell.bind.bindType, SQL_C_CHAR);
-            auto ptr = cast(immutable char*) cell.bind.data;
-            return cast(string) ptr[0..cell.bind.len];
-        }
-
-        auto get(X:int)(Cell* cell) {
-            //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
-            checkType(cell.bind.bindType, SQL_C_LONG);
-            return *(cast(int*) cell.bind.data);
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            return Date(2016,1,1); // fix
-        }
 
         void checkType(SQLSMALLINT a, SQLSMALLINT b) {
             if (a != b) throw new DatabaseException("type mismatch");

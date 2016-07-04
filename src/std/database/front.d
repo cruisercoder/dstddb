@@ -15,7 +15,6 @@ import std.container.array;
 public import std.variant;
 
 import std.range.primitives;
-import std.database.option;
 
 public import std.database.array;
 
@@ -544,7 +543,6 @@ struct BasicRow(D,P) {
         auto result = &rows_.result_;
         // needs work
         // sending a ptr to cell instead of reference (dangerous)
-        //auto cell = Cell(result, &result.data_.bind[idx], idx);
 		return Value(Cell(result, &result.data_.bind[idx], idx));
     }
 }
@@ -557,70 +555,42 @@ struct BasicValue(D,P) {
     alias Result = BasicResult!(Driver,Policy);
     alias Cell = BasicCell!(Driver,Policy);
     alias Bind = Driver.Bind;
-  //  private Result* result_;
-  //  private Bind* bind_;
     private Cell cell_;
 	private Variant data_;
     alias Converter = .Converter!(Driver,Policy);
 
-    this(/*Result* result,*/ Cell cell) {
-       // result_ = result;
-        //bind_ = bind;
+    this(Cell cell) {
         cell_ = cell;
+		data_ = resultPtr.getValue(&cell_);
     }
 
     private auto resultPtr() {
 		auto r = cell_.result_;
 		return &(r.result()); // last parens matter here (something about delegate)
     }
+
+	Variant value(){return data_;}
+
 	ubyte[] rawData(){return resultPtr.rawData(&cell_);}
 
     auto type() {return cell_.bind.type;}
 
-    auto as(T:int)() {return Converter.convert!T(resultPtr, cell_);}
-    auto as(T:string)() {return Converter.convert!T(resultPtr, cell_);}
-    auto as(T:Date)() {return Converter.convert!T(resultPtr, cell_);}
-    auto as(T:Nullable!T)() {return Nullable!T(as!T);}
+	auto as(T)(){return data_.coerce!T();}
 
-    // should be nothrow?
-    auto as(T:Variant)() {return Converter.convert!T(resultPtr, cell_);}
+	auto as(T:Variant)() {return data_;}//Converter.convert!T(resultPtr, cell_);}
 
 	bool isNull() {return resultPtr.isNull(&cell_);} //fix
 
     string name() {return resultPtr.name(cell_.idx_);}
 
-    auto get(T)() {return Nullable!T(as!T);}
-
-    // experimental
-    auto option(T)() {return Option!T(as!T);}
+	auto get(T)() {if(data_.convertsTo!T()) return Nullable!T(as!T); else return Nullable!T;}
 
     // not sure if this does anything
-    const(char)[] chars() {return as!string;}
+    //const(char)[] chars() {return as!string;}
 
-    string toString() {return as!string;}
-
-}
-
-
-
-// extra stuff
-
-/*
-struct EfficientValue(T) {
-    alias Driver = T.Driver;
-    alias Bind = Driver.Bind;
-    private Bind* bind_;
-    alias Converter = .Converter!Driver;
-
-    this(Bind* bind) {bind_ = bind;}
-
-    auto as(T:int)() {return Converter.convertDirect!T(bind_);}
-    auto as(T:string)() {return Converter.convertDirect!T(bind_);}
-    auto as(T:Date)() {return Converter.convertDirect!T(bind_);}
-    auto as(T:Variant)() {return Converter.convertDirect!T(bind_);}
+	string toString() {return data_.toString();}
 
 }
-*/
 
 struct BasicCell(D,P) {
     alias Driver = D;
@@ -650,39 +620,40 @@ struct BasicCell(D,P) {
     auto rowIdx() {return rowIdx_;}
 }
 
+//Converter now is not used, but if del it ,it will build error.
 struct Converter(D,P) {
     alias Driver = D;
     alias Policy = P;
     alias Result = Driver.Result;
-    alias Bind = Driver.Bind;
+//    alias Bind = Driver.Bind;
     alias Cell = BasicCell!(Driver,Policy);
 
-    static Y convert(Y)(Result *r, ref Cell cell) {
-        ValueType x = cell.bind.type, y = TypeInfo!Y.type;
+ //   static Y convert(Y)(Result *r, ref Cell cell) {
+      /*  ValueType x = cell.bind.type, y = TypeInfo!Y.type;
         if (x == y) return r.get!Y(&cell); // temporary
         auto e = lookup(x,y);
         if (!e) conversionError(x,y);
         Y value;
-        e.convert(r, &cell, &value);
-        return value;
-    }
+        e.convert(r, &cell, &value);*/
+//        return Y.init;
+//    }
 
-    static Y convert(Y:Variant)(Result *r, ref Cell cell) {
+ //   static Y convert(Y:Variant)(Result *r, ref Cell cell) {
         //return Y(123);
-        ValueType x = cell.bind.type, y = ValueType.Variant;
+       /* ValueType x = cell.bind.type, y = ValueType.Variant;
         auto e = lookup(x,y);
         if (!e) conversionError(x,y);
         Y value;
-        e.convert(r, &cell, &value);
-        return value;
-    }
+        e.convert(r, &cell, &value);*/
+//		return Variant();
+ //   }
 
-    static Y convertDirect(Y)(Result *r, ref Cell cell) {
-        assert(b.type == TypeInfo!Y.type);
-        return r.get!Y(&cell);
-    }
+ //   static Y convertDirect(Y)(Result *r, ref Cell cell) {
+      //  assert(b.type == TypeInfo!Y.type);
+//		return Y.init;//return r.get!Y(&cell);
+ //   }
 
-    private:
+ //  private:
 
     struct Elem {
         ValueType from,to;
@@ -690,45 +661,44 @@ struct Converter(D,P) {
     }
 
     // only cross converters, todo: all converters
-    static Elem[6] converters = [
-    {from: ValueType.Int, to: ValueType.String, &generate!(int,string).convert},
-    {from: ValueType.String, to: ValueType.Int, &generate!(string,int).convert},
-    {from: ValueType.Date, to: ValueType.String, &generate!(Date,string).convert},
+    static Elem[1] converters = [
+   // {from: ValueType.Int, to: ValueType.String, &generate!(int,string).convert},
+   // {from: ValueType.String, to: ValueType.Int, &generate!(string,int).convert},
+    //{from: ValueType.Date, to: ValueType.String, &generate!(Date,string).convert},
     // variants
     {from: ValueType.Int, to: ValueType.Variant, &generate!(int,Variant).convert},
-    {from: ValueType.String, to: ValueType.Variant, &generate!(string,Variant).convert},
-    {from: ValueType.Date, to: ValueType.Variant, &generate!(Date,Variant).convert},
+    //{from: ValueType.String, to: ValueType.Variant, &generate!(string,Variant).convert},
+    //{from: ValueType.Date, to: ValueType.Variant, &generate!(Date,Variant).convert},
     ];
 
-    static Elem* lookup(ValueType x, ValueType y) {
+  //  static Elem* lookup(ValueType x, ValueType y) {
         // rework into efficient array lookup
-        foreach(ref i; converters) {
-            if (i.from == x && i.to == y) return &i;
-        }
-        return null;
-    }
+    //    foreach(ref i; converters) {
+     //       if (i.from == x && i.to == y) return &i;
+      //  }
+   //     return null;
+  //  }
 
     struct generate(X,Y) {
         static void convert(Result *r, void *x_, void *y_) {
-            import std.conv;
+           // import std.conv;
             Cell* cell = cast(Cell*) x_;
-            *cast(Y*) y_ = to!Y(r.get!X(cell));
+           // *cast(Y*) y_ = to!Y(r.get!X(cell));
         }
     }
 
-    struct generate(X,Y:Variant) {
-        static void convert(Result *r, void *x_, void *y_) {
-            Cell* cell = cast(Cell*) x_;
-            *cast(Y*) y_ = r.get!X(cell);
-        }
-    }
+ //   struct generate(X,Y:Variant) {
+ //      static void convert(Result *r, void *x_, void *y_) {
+           // Cell* cell = cast(Cell*) x_;
+           // *cast(Y*) y_ = r.get!X(cell);
+  //      }
+ //  }
 
-    static void conversionError(ValueType x, ValueType y) {
-        import std.conv;
-        string msg;
-        msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
-        throw new DatabaseException(msg);
-    }
-
+ //   static void conversionError(ValueType x, ValueType y) {
+ //       import std.conv;
+ //       string msg;
+ //       msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
+ //       throw new DatabaseException(msg);
+ //   }
 }
 

@@ -398,24 +398,17 @@ struct Driver(Policy) {
 			return null;
 		}
 
+		Variant getValue(Cell* cell)
+		{
+			return Variant; //TODO:
+		}
+
+
 		bool isNull(Cell* cell){return false;}
 
         auto name(size_t idx) {
             return "-name-";
         }
-
-        auto get(X:string)(Cell* cell) {
-            return "abc";
-        }
-
-        auto get(X:int)(Cell* cell) {
-            return 0;
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            return Date(2016,1,1); // fix
-        }
-
     }
 
 }

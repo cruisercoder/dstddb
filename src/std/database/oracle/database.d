@@ -627,29 +627,41 @@ struct Driver(Policy) {
 		//return ptr[0..strlen(ptr)];
 	}
 
+	Variant getValue(Cell* cell)
+	{
+		Variant value;
+		switch(cell.bind.oType)
+		{
+				case SQLT_STR:
+				{
+					import core.stdc.string: strlen;
+					//checkType(cell.bind.oType, SQLT_STR);
+					auto ptr = cast(immutable char*) data(cell);
+					value =  cast(string) ptr[0..strlen(ptr)]; // fix with length
+				}
+					break;
+				case SQLT_INT:
+					value = *(cast(int*) data(cell));
+					break;
+				case SQLT_ODT:
+				{
+					auto d = cast(OCIDate*) data(cell);
+					value = Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
+				}
+					break;
+				default:
+					break;
+
+		}
+			return value; //TODO:
+	}
+
+
 	bool isNull(Cell* cell){return false;}
 
-    auto get(X:string)(Cell* cell) {
-        import core.stdc.string: strlen;
-        checkType(cell.bind.oType, SQLT_STR);
-        auto ptr = cast(immutable char*) data(cell);
-        return cast(string) ptr[0..strlen(ptr)]; // fix with length
-    }
 
     auto name(size_t idx) {
         return describe[idx].name;
-    }
-
-    auto get(X:int)(Cell* cell) {
-        checkType(cell.bind.oType, SQLT_INT);
-        return *(cast(int*) data(cell));
-    }
-
-    auto get(X:Date)(Cell* cell) {
-        //return Date(2016,1,1); // fix
-        checkType(cell.bind.oType, SQLT_ODT);
-        auto d = cast(OCIDate*) data(cell);
-        return Date(d.OCIDateYYYY,d.OCIDateMM,d.OCIDateDD);
     }
 
     private void* data(Cell* cell) {

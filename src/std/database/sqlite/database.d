@@ -246,22 +246,34 @@ struct Driver(Policy) {
 			return null; //TODO: fix
 		}
 
-		bool isNull(Cell* cell){return false;}
+		Variant getValue(Cell* cell){
+			Variant value;
+			int idx = cast(int)cell.bind.idx;
+			switch(sqlite3_column_type(st_,idx))
+			{
+				case SQLITE_INTEGER:
+					value = sqlite3_column_int(st_, idx);
+					break;
+				case SQLITE_FLOAT:
+					value = sqlite3_column_double(st_,idx);
+					break;
+				case SQLITE3_TEXT:
+				{
+					import core.stdc.string: strlen;
+					auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) cell.bind.idx);
+					value = cast(string) ptr[0..strlen(ptr)]; // fix with length
+				}	
+					break;
+				case SQLITE_BLOB:
+					break;
+				case SQLITE_NULL:
+					break;
+			}
+			return value; //TODO:
+		}
 
-        auto get(X:string)(Cell* cell) {
-            import core.stdc.string: strlen;
-            auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) cell.bind.idx);
-            return cast(string) ptr[0..strlen(ptr)]; // fix with length
-        }
 
-        auto get(X:int)(Cell* cell) {
-            return sqlite3_column_int(st_, cast(int) cell.bind.idx);
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            return Date(2016,1,1); // fix
-        }
-
+		bool isNull(Cell* cell){return sqlite3_column_type(st_,cast(int)cell.bind.idx) == SQLITE_NULL;}
     }
 
     private static void throw_error()(sqlite3 *sq, string msg, int ret) {

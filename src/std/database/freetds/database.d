@@ -344,28 +344,28 @@ struct Driver(Policy) {
 			return null;
 		}
 
+		Variant getValue(Cell* cell)
+		{
+			Variant value;
+			if(cell.bind.type == ValueType.Date)
+			{
+				auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
+				DBDATEREC d;
+				check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
+				value = Date(d.year, d.month, d.day);
+				 
+			}
+			else
+			{
+				import core.stdc.string: strlen;
+				checkType(cell.bind.bindType, NTBSTRINGBIND);
+				auto ptr = cast(immutable char*) cell.bind.data.ptr;
+				value = cast(string) ptr[0..strlen(ptr)];
+			}
+			return value; 
+		}
+
 		bool isNull(Cell* cell){return false;}
-
-        auto get(X:string)(Cell* cell) {
-            import core.stdc.string: strlen;
-            checkType(cell.bind.bindType, NTBSTRINGBIND);
-            auto ptr = cast(immutable char*) cell.bind.data.ptr;
-            return cast(string) ptr[0..strlen(ptr)];
-        }
-
-        auto get(X:int)(Cell* cell) {
-            //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
-            //checkType(b.bindType, SQL_C_LONG);
-            //return *(cast(int*) b.data);
-            return 0;
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
-            DBDATEREC d;
-            check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
-            return Date(d.year, d.month, d.day);
-        }
 
         void checkType(int a, int b) {
             if (a != b) throw new DatabaseException("type mismatch");

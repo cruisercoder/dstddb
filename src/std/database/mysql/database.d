@@ -179,10 +179,10 @@ private struct Driver(Policy)
             for (int i = 0; i != bind.length; ++i)
             {
                 mysqlBind ~= MYSQL_BIND();
-                //import core.stdc.string: memset;
-                //memset(mb, 0, MYSQL_BIND.sizeof); // might not be needed: D struct
                 auto b = &bind[i];
                 auto mb = &mysqlBind[i];
+				//import core.stdc.string: memset;
+				//memset(mb, 0, MYSQL_BIND.sizeof); // might not be needed: D struct
                 mb.buffer_type = b.mysql_type;
                 mb.buffer = b.data.ptr;
                 mb.buffer_length = b.allocSize;
@@ -409,6 +409,7 @@ private struct Driver(Policy)
                     bind ~= Bind();
                     auto b = &bind.back();
                     b.mysql_type = d.field.type;
+					b.allocSize = cast(uint)(d.field.length + 1);
                     switch (d.field.type)
                     {
                     case MYSQL_TYPE_TINY:
@@ -417,10 +418,6 @@ private struct Driver(Policy)
                     case MYSQL_TYPE_SHORT:
                         b.type = ValueType.Short;
                         break;
-                        /*	case MYSQL_TYPE_INT24:
-							b.mysql_type = MYSQL_TYPE_STRING;
-							b.type = ValueType.
-							goto case;*/
                     case MYSQL_TYPE_LONG:
                         b.type = ValueType.Int;
                         break;
@@ -440,16 +437,19 @@ private struct Driver(Policy)
                     case MYSQL_TYPE_TIME:
                     case MYSQL_TYPE_TIME2:
                         b.type = ValueType.Time;
+						b.allocSize += 30;
                         break;
                     case MYSQL_TYPE_DATETIME2:
                     case MYSQL_TYPE_DATETIME:
                     case MYSQL_TYPE_TIMESTAMP2:
                     case MYSQL_TYPE_TIMESTAMP:
                         b.type = ValueType.DateTime;
+						b.allocSize += 30;
                         break;
                     default:
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
+						b.allocSize += 256;
                         break;
 
                     }
@@ -464,8 +464,6 @@ private struct Driver(Policy)
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
                     }*/
-
-                    b.allocSize = cast(uint)(d.field.length + 1);
                     b.data = allocator.allocate(b.allocSize);
                 }
 
@@ -583,8 +581,9 @@ private struct Driver(Policy)
              */
             ubyte[] rawData(Cell* cell)
             {
+				log("-----------bind.bufferLength = ", cell.bind.allocSize , " , dataLength = ", cell.bind.length);
                 auto ptr = cast(ubyte*) cell.bind.data.ptr;
-                return ptr[0 .. cell.bind.length];
+				return ptr[0 .. cell.bind.length];
             }
 
             bool isNull(Cell* cell)
@@ -595,22 +594,6 @@ private struct Driver(Policy)
             auto name(size_t idx)
             {
                 return describe[idx].name;
-            }
-
-            auto get(X : string)(Cell* cell)
-            {
-                writeln("tostring``````````");
-                return getValue(cell).toString();
-            }
-
-            auto get(X : int)(Cell* cell)
-            {
-                return getValue(cell).get!X();
-            }
-
-            auto get(X : Date)(Cell* cell)
-            {
-                return getValue(cell).get!X();
             }
 
             static void checkType(T)(Bind* b)
@@ -945,61 +928,71 @@ private struct Driver(Policy)
 
                 bind.reserve(columns);
 
-                for (int i = 0; i < columns; ++i)
-                {
-                    auto d = &describe[i];
-                    bind ~= Bind();
-                    auto b = &bind.back();
-
-                    switch (d.field.type)
-                    {
-                    case MYSQL_TYPE_TINY:
-                        b.type = ValueType.Char;
-                        break;
-                    case MYSQL_TYPE_SHORT:
-                        b.type = ValueType.Short;
-                        break;
-                    case MYSQL_TYPE_INT24:
-                        b.mysql_type = MYSQL_TYPE_LONG;
-                        goto case;
-                    case MYSQL_TYPE_LONG:
+				for (int i = 0; i != columns; ++i)
+				{
+					auto d = &describe[i];
+					bind ~= Bind();
+					auto b = &bind.back();
+					b.mysql_type = d.field.type;
+					b.allocSize = cast(uint)(d.field.length + 1);
+					switch (d.field.type)
+					{
+						case MYSQL_TYPE_TINY:
+							b.type = ValueType.Char;
+							break;
+						case MYSQL_TYPE_SHORT:
+							b.type = ValueType.Short;
+							break;
+						case MYSQL_TYPE_LONG:
+							b.type = ValueType.Int;
+							break;
+						case MYSQL_TYPE_LONGLONG:
+							b.type = ValueType.Long;
+							break;
+						case MYSQL_TYPE_FLOAT:
+							b.type = ValueType.Float;
+							break;
+						case MYSQL_TYPE_DOUBLE:
+							b.type = ValueType.Double;
+							break;
+							
+						case MYSQL_TYPE_DATE:
+							b.type = ValueType.Date;
+							break;
+						case MYSQL_TYPE_TIME:
+						case MYSQL_TYPE_TIME2:
+							b.type = ValueType.Time;
+							b.allocSize += 30;
+							break;
+						case MYSQL_TYPE_DATETIME2:
+						case MYSQL_TYPE_DATETIME:
+						case MYSQL_TYPE_TIMESTAMP2:
+						case MYSQL_TYPE_TIMESTAMP:
+							b.type = ValueType.DateTime;
+							b.allocSize += 30;
+							break;
+						default:
+							b.mysql_type = MYSQL_TYPE_STRING;
+							b.type = ValueType.String;
+							b.allocSize += 256;
+							break;
+							
+					}
+					// let in ints for now
+					/*    if (d.field.type == MYSQL_TYPE_LONG) {
+                        b.mysql_type = d.field.type;
                         b.type = ValueType.Int;
-                        break;
-                    case MYSQL_TYPE_LONGLONG:
-                        b.type = ValueType.Long;
-                        break;
-                    case MYSQL_TYPE_FLOAT:
-                        b.type = ValueType.Float;
-                        break;
-                    case MYSQL_TYPE_DOUBLE:
-                        b.type = ValueType.Double;
-                        break;
-
-                    case MYSQL_TYPE_DATE:
+                    } else if (d.field.type == MYSQL_TYPE_DATE) {
+                        b.mysql_type = d.field.type;
                         b.type = ValueType.Date;
-                        break;
-                    case MYSQL_TYPE_TIME:
-                    case MYSQL_TYPE_TIME2:
-                        b.type = ValueType.Time;
-                        break;
-                    case MYSQL_TYPE_DATETIME2:
-                    case MYSQL_TYPE_DATETIME:
-                    case MYSQL_TYPE_TIMESTAMP2:
-                    case MYSQL_TYPE_TIMESTAMP:
-                        b.type = ValueType.DateTime;
-                        break;
-                    default:
+                    } else {
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
-                        break;
-
-                    }
-
-                    b.allocSize = cast(uint)(d.field.length + 1);
-                    b.data = allocator.allocate(b.allocSize);
-                }
-
-                bindSetup(bind, mysqlBind);
+                    }*/
+					b.data = allocator.allocate(b.allocSize);
+				}
+				
+				bindSetup(bind, mysqlBind);
 
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
@@ -1095,21 +1088,6 @@ private struct Driver(Policy)
             bool isNull(Cell* cell)
             {
                 return cell.bind.is_null > 0;
-            }
-
-            auto get(X : string)(Cell* cell)
-            {
-                return getValue(cell).toString();
-            }
-
-            auto get(X : int)(Cell* cell)
-            {
-                return getValue(cell).get!X();
-            }
-
-            auto get(X : Date)(Cell* cell)
-            {
-                return getValue(cell).get!X();
             }
 
             static void checkType(T)(Bind* b)

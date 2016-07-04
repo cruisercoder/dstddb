@@ -488,32 +488,41 @@ struct Driver(Policy) {
 			return ptr[0..len(cell.bind.idx)];
 		}
 
+		Variant getValue(Cell* cell)
+		{
+			Variant value;
+			switch(type(cell.bind.idx))
+			{
+				case VARCHAROID:
+				{
+					immutable char *ptr = cast(immutable char*) data(cell.bind.idx);
+					value = cast(string) ptr[0..len(cell.bind.idx)];
+				}
+					break;
+				case INT4OID:
+				{
+					import std.bitmanip;
+					auto p = cast(ubyte*) data(cell.bind.idx);
+					value =  bigEndianToNative!int(p[0..int.sizeof]);
+				}
+					break;
+				case DATEOID:
+				{
+					import std.bitmanip;
+					auto ptr = cast(ubyte*) data(cell.bind.idx);
+					int sz = len(cell.bind.idx);
+					date d = bigEndianToNative!uint(ptr[0..4]); // why not sz?
+					int[3] mdy;
+					PGTYPESdate_julmdy(d, &mdy[0]);
+					value = Date(mdy[2],mdy[0],mdy[1]);
+				}
+					break;
+			}
+			return value; //TODO:
+		}
+
 
 		bool isNull(Cell* cell){return false;}
-
-        auto get(X:string)(Cell* cell) {
-            checkType(type(cell.bind.idx),VARCHAROID);
-            immutable char *ptr = cast(immutable char*) data(cell.bind.idx);
-            return cast(string) ptr[0..len(cell.bind.idx)];
-        }
-
-        auto get(X:int)(Cell* cell) {
-            import std.bitmanip;
-            checkType(type(cell.bind.idx),INT4OID);
-            auto p = cast(ubyte*) data(cell.bind.idx);
-            return bigEndianToNative!int(p[0..int.sizeof]);
-        }
-
-        auto get(X:Date)(Cell* cell) {
-            import std.bitmanip;
-            checkType(type(cell.bind.idx),DATEOID);
-            auto ptr = cast(ubyte*) data(cell.bind.idx);
-            int sz = len(cell.bind.idx);
-            date d = bigEndianToNative!uint(ptr[0..4]); // why not sz?
-            int[3] mdy;
-            PGTYPESdate_julmdy(d, &mdy[0]);
-            return Date(mdy[2],mdy[0],mdy[1]);
-        }
 
         void checkType(int a, int b) {
             if (a != b) throw new DatabaseException("type mismatch");
