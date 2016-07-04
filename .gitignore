@@ -15,4 +15,6 @@ __test__*__
 *.userprefs
 .directory
 .project
-
+*.txt
+*.cmake
+*.kdev4
