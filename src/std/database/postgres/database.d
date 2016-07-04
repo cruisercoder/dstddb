@@ -622,14 +622,14 @@ struct Driver(Policy) {
                     immutable char* ptr = cast(immutable char*) dt;
                     auto str = cast(string) ptr[0 .. leng];
                     if (s == "true" || s == "t" || s == "1")
-                        value = true;
+                        value = 1;
                     else if (s == "false" || s == "f" || s == "0")
-                        value = false;
+                        value = 0;
                     else {
                         auto t = cast(ubyte*) ptr;
                         ubyte[int.sizeof] data;
                         data[] = t[0 .. int.sizeof];
-                        value = (bigEndianToNative!int(data) > 0);
+                        value = bigEndianToNative!int(data);
                     }
                 }
                 break;
