@@ -11,4 +11,8 @@ dub.selections.json
 #unit test binaries
 tests/*/tests
 __test__*__
+*.user
+*.userprefs
+.directory
+.project
 
