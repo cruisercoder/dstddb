@@ -863,6 +863,10 @@ private struct Driver(Policy) {
                         b.type = ValueType.DateTime;
                         b.allocSize += 30;
                         break;
+					case MYSQL_TYPE_BLOB:
+						b.type = ValueType.Raw;
+						b.allocSize += 512;
+						break;
                     default:
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
@@ -950,6 +954,11 @@ private struct Driver(Policy) {
                             t.second);
                     }
                     break;
+				case ValueType.Raw:{
+						auto ptr = cast(ubyte * ) cell.bind.data.ptr;
+						value = ptr[0 .. cell.bind.length];
+					}
+					break;
                 default:
                     break;
                 }
