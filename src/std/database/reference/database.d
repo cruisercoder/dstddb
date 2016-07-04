@@ -18,38 +18,37 @@ struct DefaultPolicy {
 
 // this function is module specific because it allows 
 // a default template to be specified
-auto createDatabase()(string defaultUrl=null) {
-    return Database!DefaultPolicy(defaultUrl);  
+auto createDatabase()(string defaultUrl = null) {
+    return Database!DefaultPolicy(defaultUrl);
 }
 
 //one for specfic type
-auto createDatabase(T)(string defaultUrl=null) {
-    return Database!T(defaultUrl);  
+auto createDatabase(T)(string defaultUrl = null) {
+    return Database!T(defaultUrl);
 }
 
 // these functions can be moved into util once a solution to forward bug is found
 
 auto connection(T)(Database!T db, string source) {
-    return Connection!T(db,source);
+    return Connection!T(db, source);
 }
 
-auto statement(T) (Connection!T con, string sql) {
+auto statement(T)(Connection!T con, string sql) {
     return Statement!T(con, sql);
 }
 
-auto statement(T, X...) (Connection!T con, string sql, X args) {
+auto statement(T, X...)(Connection!T con, string sql, X args) {
     return Statement!T(con, sql, args);
 }
 
 auto result(T)(Statement!T stmt) {
-    return Result!T(stmt);  
+    return Result!T(stmt);
 }
 
 struct Database(T) {
     alias Allocator = T.Allocator;
 
     static const auto queryVariableType = QueryVariableType.QuestionMark;
-
 
     private struct Payload {
         string defaultURI;
@@ -65,8 +64,13 @@ struct Database(T) {
             info("closing database resource");
         }
 
-        this(this) { assert(false); }
-        void opAssign(Database.Payload rhs) { assert(false); }
+        this(this) {
+            assert(false);
+        }
+
+        void opAssign(Database.Payload rhs) {
+            assert(false);
+        }
     }
 
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
@@ -77,21 +81,31 @@ struct Database(T) {
     }
 }
 
-
 struct Connection(T) {
     alias Database = .Database!T;
     //alias Statement = .Statement!T;
 
-    auto statement(string sql) {return Statement!T(this,sql);}
-    auto statement(X...) (string sql, X args) {return Statement!T(this,sql,args);}
-    auto query(string sql) {return statement(sql).query();}
-    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
-
-    package this(Database db, string source) {
-        data_ = Data(db,source);
+    auto statement(string sql) {
+        return Statement!T(this, sql);
     }
 
-    private:
+    auto statement(X...)(string sql, X args) {
+        return Statement!T(this, sql, args);
+    }
+
+    auto query(string sql) {
+        return statement(sql).query();
+    }
+
+    auto query(T...)(string sql, T args) {
+        return statement(sql).query(args);
+    }
+
+    package this(Database db, string source) {
+        data_ = Data(db, source);
+    }
+
+private:
 
     struct Payload {
         Database db;
@@ -107,8 +121,13 @@ struct Connection(T) {
         ~this() {
         }
 
-        this(this) { assert(false); }
-        void opAssign(Connection.Payload rhs) { assert(false); }
+        this(this) {
+            assert(false);
+        }
+
+        void opAssign(Connection.Payload rhs) {
+            assert(false);
+        }
     }
 
     private alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
@@ -122,18 +141,23 @@ struct Statement(T) {
     //alias Range = Result.Range; // error Result.Payload no size yet for forward reference
 
     // temporary
-    auto result() {return Result!T(this);}
-    auto opSlice() {return result();}
+    auto result() {
+        return Result!T(this);
+    }
+
+    auto opSlice() {
+        return result();
+    }
 
     this(Connection con, string sql) {
-        data_ = Data(con,sql);
+        data_ = Data(con, sql);
         //prepare();
         // must be able to detect binds in all DBs
         //if (!data_.binds) query();
     }
 
-    this(T...) (Connection con, string sql, T args) {
-        data_ = Data(con,sql);
+    this(T...)(Connection con, string sql, T args) {
+        data_ = Data(con, sql);
         //prepare();
         //bindAll(args);
         //query();
@@ -145,10 +169,10 @@ struct Statement(T) {
     void bind(int n, int value) {
     }
 
-    void bind(int n, const char[] value){
+    void bind(int n, const char[] value) {
     }
 
-    private:
+private:
 
     struct Payload {
         Connection con;
@@ -161,29 +185,37 @@ struct Statement(T) {
             sql = sql_;
         }
 
-        this(this) { assert(false); }
-        void opAssign(Statement.Payload rhs) { assert(false); }
+        this(this) {
+            assert(false);
+        }
+
+        void opAssign(Statement.Payload rhs) {
+            assert(false);
+        }
     }
 
     alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
     Data data_;
 
-    public:
+public:
 
-    void exec() {}
-    void prepare() {}
+    void exec() {
+    }
+
+    void prepare() {
+    }
 
     auto query() {
         return result();
     }
 
-    auto query(X...) (X args) {
+    auto query(X...)(X args) {
         return query();
     }
 
-    private:
+private:
 
-    void bindAll(T...) (T args) {
+    void bindAll(T...)(T args) {
         int col;
         foreach (arg; args) {
             bind(++col, arg);
@@ -204,12 +236,19 @@ struct Result(T) {
         data_ = Data(stmt);
     }
 
-    auto opSlice() {return ResultRange(this);}
+    auto opSlice() {
+        return ResultRange(this);
+    }
 
-    bool start() {return true;}
-    bool next() {return data_.next();}
+    bool start() {
+        return true;
+    }
 
-    private:
+    bool next() {
+        return data_.next();
+    }
+
+private:
 
     struct Payload {
         Statement stmt;
@@ -223,8 +262,13 @@ struct Result(T) {
             return false;
         }
 
-        this(this) { assert(false); }
-        void opAssign(Statement.Payload rhs) { assert(false); }
+        this(this) {
+            assert(false);
+        }
+
+        void opAssign(Statement.Payload rhs) {
+            assert(false);
+        }
     }
 
     alias RefCounted!(Payload, RefCountedAutoInitialize.no) Data;
@@ -233,15 +277,17 @@ struct Result(T) {
 }
 
 struct Value {
-    auto as(T:int)() {
+    auto as(T : int)() {
         return 0;
     }
 
-    auto as(T:string)() {
+    auto as(T : string)() {
         return "value";
     }
 
-    auto chars() {return "value";}
+    auto chars() {
+        return "value";
+    }
 }
 
 struct ResultRange(T) {
@@ -255,19 +301,33 @@ struct ResultRange(T) {
         ok_ = result_.start();
     }
 
-    bool empty() {return !ok_;}
-    Row front() {return Row(&result_);}
-    void popFront() {ok_ = result_.next();}
-}
+    bool empty() {
+        return !ok_;
+    }
 
+    Row front() {
+        return Row(&result_);
+    }
+
+    void popFront() {
+        ok_ = result_.next();
+    }
+}
 
 struct Row(T) {
     alias Result = .Result!T;
     alias Value = .Value;
-    this(Result* result) { result_ = result;}
-    Value opIndex(size_t idx) {return Value();}
+    this(Result* result) {
+        result_ = result;
+    }
+
+    Value opIndex(size_t idx) {
+        return Value();
+    }
+
     private Result* result_;
 
-    int columns() {return 0;}
+    int columns() {
+        return 0;
+    }
 }
-

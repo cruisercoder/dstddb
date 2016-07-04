@@ -28,46 +28,65 @@ public import std.database.array;
    (version_major == 2 && version_minor == 70));
  */
 
-struct Time
-{
-	this(uint h, uint m, uint s = 0, uint ms = 0)
-	{
-		hour = h; minute = m; second = s; msecond = ms;
-	}
+struct Time {
+    this(uint h, uint m, uint s = 0, uint ms = 0) {
+        hour = h;
+        minute = m;
+        second = s;
+        msecond = ms;
+    }
 
-	uint hour;
-	uint minute;
-	uint second;
-	uint msecond;
+    uint hour;
+    uint minute;
+    uint second;
+    uint msecond;
 }
 
 enum ValueType {
-	Char,
+    Char,
 
     Short,
-	Int,
-	Long,
+    Int,
+    Long,
 
-	Float,
-	Double,
+    Float,
+    Double,
 
     String,
 
     Date,
-	Time,
-	DateTime,
+    Time,
+    DateTime,
 
     Raw,
 
-	Variant //TODO: remove
+    Variant //TODO: remove
 }
 
 // improve
-struct TypeInfo(T:int) {static auto type() {return ValueType.Int;}}
-struct TypeInfo(T:string) {static auto type() {return ValueType.String;}}
-struct TypeInfo(T:Date) {static auto type() {return ValueType.Date;}}
-struct TypeInfo(T:Variant) {static auto type() {return ValueType.Variant;}}
+struct TypeInfo(T : int) {
+    static auto type() {
+        return ValueType.Int;
+    }
+}
 
+struct TypeInfo(T : string) {
+    static auto type() {
+        return ValueType.String;
+    }
+}
+
+struct TypeInfo(T : Date) {
+    static auto type() {
+        return ValueType.Date;
+    }
+}
+
+struct TypeInfo(T : Variant) {
+    static auto type() {
+        return ValueType.Variant;
+    }
+}
 
 enum Feature {
     InputBinding,
@@ -78,35 +97,60 @@ enum Feature {
 
 alias FeatureArray = Feature[];
 
-struct BasicDatabase(D,P) {
+struct BasicDatabase(D, P) {
     alias Driver = D;
     alias Policy = P;
     alias Database = Driver.Database;
     alias Allocator = Policy.Allocator;
-    alias Connection = BasicConnection!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Connection = BasicConnection!(Driver, Policy);
+    alias Cell = BasicCell!(Driver, Policy);
     alias Pool = .Pool!(Driver.Connection);
     alias ScopedResource = .ScopedResource!Pool;
 
     alias queryVariableType = Database.queryVariableType;
 
-    static auto create() {return BasicDatabase(null);}
-    static auto create(string url) {return BasicDatabase(url);}
+    static auto create() {
+        return BasicDatabase(null);
+    }
 
-    auto connection() {return Connection(this);}
-    auto connection(string uri) {return Connection(this, uri);}
+    static auto create(string url) {
+        return BasicDatabase(url);
+    }
 
-    auto statement(string sql) {return connection().statement(sql);}
-    auto statement(X...) (string sql, X args) {return connection.statement(sql,args);}
+    auto connection() {
+        return Connection(this);
+    }
 
-    auto query(string sql) {return connection().query(sql);}
-    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
+    auto connection(string uri) {
+        return Connection(this, uri);
+    }
+
+    auto statement(string sql) {
+        return connection().statement(sql);
+    }
+
+    auto statement(X...)(string sql, X args) {
+        return connection.statement(sql, args);
+    }
+
+    auto query(string sql) {
+        return connection().query(sql);
+    }
+
+    auto query(T...)(string sql, T args) {
+        return statement(sql).query(args);
+    }
 
     //static bool hasFeature(Feature feature);
     // go with non-static hasFeature for now to accomidate poly driver
 
-    bool hasFeature(Feature feature) {return hasFeature(data_.database, feature);}
-auto ref driverDatabase() {return data_.database;}
+    bool hasFeature(Feature feature) {
+        return hasFeature(data_.database, feature);
+    }
+
+    auto ref driverDatabase() {
+        return data_.database;
+    }
 
     private struct Payload {
         string defaultURI;
@@ -130,12 +174,12 @@ auto ref driverDatabase() {return data_.database;}
 
     // for poly
     static if (hasMember!(Database, "register")) {
-        static void register(DB) (string name = "") {
-            Database.register!DB(name); 
+        static void register(DB)(string name = "") {
+            Database.register!DB(name);
         }
 
         auto database(string name) {
-            auto db = BasicDatabase(data_.defaultURI); 
+            auto db = BasicDatabase(data_.defaultURI);
             db.data_.database.setDatabase(name);
             return db;
         }
@@ -143,27 +187,39 @@ auto ref driverDatabase() {return data_.database;}
 
     private static bool hasFeature(ref Database db, Feature feature) {
         import std.algorithm;
-        import std.range.primitives: empty;
+        import std.range.primitives : empty;
+
         //auto r = find(Database.features, feature);
         auto r = find(db.features, feature);
         return !r.empty;
     }
 }
 
-struct BasicConnection(D,P) {
+struct BasicConnection(D, P) {
     alias Driver = D;
     alias Policy = P;
     alias DriverConnection = Driver.Connection;
-    alias Statement = BasicStatement!(Driver,Policy);
-    alias Database = BasicDatabase!(Driver,Policy);
+    alias Statement = BasicStatement!(Driver, Policy);
+    alias Database = BasicDatabase!(Driver, Policy);
     alias Pool = Database.Pool;
     alias ScopedResource = Database.ScopedResource;
     alias DatabaseImpl = Driver.Database;
 
-    auto statement(string sql) {return Statement(this,sql);}
-    auto statement(X...) (string sql, X args) {return Statement(this,sql,args);}
-    auto query(string sql) {return statement(sql).query();}
-    auto query(T...) (string sql, T args) {return statement(sql).query(args);}
+    auto statement(string sql) {
+        return Statement(this, sql);
+    }
+
+    auto statement(X...)(string sql, X args) {
+        return Statement(this, sql, args);
+    }
+
+    auto query(string sql) {
+        return statement(sql).query();
+    }
+
+    auto query(T...)(string sql, T args) {
+        return statement(sql).query(args);
+    }
 
     auto rowArraySize(int rows) {
         rowArraySize_ = rows;
@@ -178,7 +234,9 @@ struct BasicConnection(D,P) {
     string uri_;
     int rowArraySize_ = 1;
 
-    package this(Database db) {this(db,"");}
+    package this(Database db) {
+        this(db, "");
+    }
 
     package this(Database db, string uri) {
         //db_ = db;
@@ -209,7 +267,9 @@ struct BasicConnection(D,P) {
     }
 
     static if (hasMember!(Database, "socket")) {
-        auto socket() {return driverConnection.socket;}
+        auto socket() {
+            return driverConnection.socket;
+        }
     }
 
     // handle()
@@ -217,7 +277,9 @@ struct BasicConnection(D,P) {
     // while a handle is in use  (Use a connection variable to extend scope)
 
     static if (hasMember!(Database, "handle")) {
-        auto handle() {return driverConnection.handle;}
+        auto handle() {
+            return driverConnection.handle;
+        }
     }
 
     /*
@@ -227,17 +289,16 @@ data_ = Data(&db.data_.refCountedPayload(),uri);
 }
      */
 
-
 }
 
-struct BasicStatement(D,P) {
+struct BasicStatement(D, P) {
     alias Driver = D;
     alias Policy = P;
     alias DriverStatement = Driver.Statement;
-    alias Connection = BasicConnection!(Driver,Policy);
-    alias Result = BasicResult!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
-    alias ColumnSet = BasicColumnSet!(Driver,Policy);
+    alias Connection = BasicConnection!(Driver, Policy);
+    alias Result = BasicResult!(Driver, Policy);
+    alias RowSet = BasicRowSet!(Driver, Policy);
+    alias ColumnSet = BasicColumnSet!(Driver, Policy);
     //alias Allocator = Policy.Allocator;
     alias ScopedResource = Connection.ScopedResource;
 
@@ -255,10 +316,9 @@ struct BasicStatement(D,P) {
         Executed,
     }
 
-
     this(Connection con, string sql) {
         con_ = con;
-        data_ = Data(con_.driverConnection,sql);
+        data_ = Data(con_.driverConnection, sql);
         rowArraySize_ = con.rowArraySize_;
         prepare();
     }
@@ -273,11 +333,18 @@ struct BasicStatement(D,P) {
     }
      */
 
-    string sql() {return data_.sql;}
+    string sql() {
+        return data_.sql;
+    }
     //int binds() {return data_.binds;}
 
-    void bind(int n, int value) {data_.bind(n, value);}
-    void bind(int n, const char[] value){data_.bind(n,value);}
+    void bind(int n, int value) {
+        data_.bind(n, value);
+    }
+
+    void bind(int n, const char[] value) {
+        data_.bind(n, value);
+    }
 
     auto query() {
         data_.query();
@@ -285,19 +352,22 @@ struct BasicStatement(D,P) {
         return this;
     }
 
-    auto query(X...) (X args) {
+    auto query(X...)(X args) {
         data_.query(args);
         state = State.Executed;
         return this;
     }
 
-    auto into(A...) (ref A args) {
-        if (state != State.Executed) throw new DatabaseException("not executed");
+    auto into(A...)(ref A args) {
+        if (state != State.Executed)
+            throw new DatabaseException("not executed");
         rows.into(args);
         return this;
     }
 
-    bool hasRows() {return data_.hasRows;}
+    bool hasRows() {
+        return data_.hasRows;
+    }
 
     // rows()
     // accessor for single rowSet returned
@@ -305,24 +375,26 @@ struct BasicStatement(D,P) {
     // alternate name: rowSet, table
 
     auto rows() {
-        if (state != State.Executed) query();
+        if (state != State.Executed)
+            query();
         return RowSet(Result(this, rowArraySize_));
     }
 
     auto columns() {
-        if (state != State.Executed) query();
+        if (state != State.Executed)
+            query();
         return ColumnSet(Result(this, rowArraySize_));
     }
 
     // results()
     // returns range for one or more things returned by a query
     auto results() {
-        if (state != State.Executed) throw new DatabaseException("not executed");
+        if (state != State.Executed)
+            throw new DatabaseException("not executed");
         return 0; // fill in
     }
 
-
-    private:
+private:
     alias RefCounted!(DriverStatement, RefCountedAutoInitialize.no) Data;
 
     Data data_;
@@ -335,16 +407,17 @@ struct BasicStatement(D,P) {
         state = State.Prepared;
     }
 
-    void reset() {data_.reset();} //SQLCloseCursor
+    void reset() {
+        data_.reset();
+    } //SQLCloseCursor
 }
 
-
-struct BasicResult(D,P) {
+struct BasicResult(D, P) {
     alias Driver = D;
     alias Policy = P;
     alias ResultImpl = Driver.Result;
-    alias Statement = BasicStatement!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
+    alias Statement = BasicStatement!(Driver, Policy);
+    alias RowSet = BasicRowSet!(Driver, Policy);
     //alias Allocator = Driver.Policy.Allocator;
     alias Bind = Driver.Bind;
     //alias Row = .Row;
@@ -353,7 +426,8 @@ struct BasicResult(D,P) {
         stmt_ = stmt;
         rowArraySize_ = rowArraySize;
         data_ = Data(&stmt.data_.refCountedPayload(), rowArraySize_);
-        if (!stmt_.hasRows) throw new DatabaseException("not a result query");
+        if (!stmt_.hasRows)
+            throw new DatabaseException("not a result query");
         rowsFetched_ = data_.fetch();
     }
 
@@ -361,20 +435,25 @@ struct BasicResult(D,P) {
     //auto opSlice() {return ResultRange(this);}
 
 package:
-    int rowsFetched() {return rowsFetched_;}
+    int rowsFetched() {
+        return rowsFetched_;
+    }
 
     bool next() {
         if (++rowIdx_ == rowsFetched_) {
             rowsFetched_ = data_.fetch();
-            if (!rowsFetched_) return false;
+            if (!rowsFetched_)
+                return false;
             rowIdx_ = 0;
         }
         return true;
     }
 
-    auto ref result() {return data_.refCountedPayload();}
+    auto ref result() {
+        return data_.refCountedPayload();
+    }
 
-    private:
+private:
     Statement stmt_;
     int rowArraySize_; //maybe move into RC
     int rowIdx_;
@@ -384,48 +463,66 @@ package:
     Data data_;
 
     // these need to move
-    int width() {return data_.columns;}
+    int width() {
+        return data_.columns;
+    }
 
     private size_t index(string name) {
         import std.uni;
+
         // slow name lookup, all case insensitive for now
-        for(int i=0; i!=width; i++) {
-            if (sicmp(data_.name(i), name) == 0) return i;
+        for (int i = 0; i != width; i++) {
+            if (sicmp(data_.name(i), name) == 0)
+                return i;
         }
         throw new DatabaseException("column name not found:" ~ name);
     }
 }
 
-struct BasicColumnSet(D,P) {
+struct BasicColumnSet(D, P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Column = BasicColumn!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
+    alias Column = BasicColumn!(Driver, Policy);
     private Result result_;
 
     this(Result result) {
         result_ = result;
     }
 
-    int width() {return result_.data_.columns;}
+    int width() {
+        return result_.data_.columns;
+    }
 
     struct Range {
         private Result result_;
         int idx;
-        this(Result result) {result_ = result;}
-        bool empty() {return idx == result_.data_.columns;}
-        auto front() {return Column(result_, idx);}
-        void popFront() {++idx;}
+        this(Result result) {
+            result_ = result;
+        }
+
+        bool empty() {
+            return idx == result_.data_.columns;
+        }
+
+        auto front() {
+            return Column(result_, idx);
+        }
+
+        void popFront() {
+            ++idx;
+        }
     }
 
-    auto opSlice() {return Range(result_);}
+    auto opSlice() {
+        return Range(result_);
+    }
 }
 
-
-struct BasicColumn(D,P) {
+struct BasicColumn(D, P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
     private Result result_;
     private size_t idx_;
 
@@ -434,18 +531,22 @@ struct BasicColumn(D,P) {
         idx_ = idx;
     }
 
-    auto idx() {return idx_;}
-	auto name() {return result_.data_.name(idx_);}
+    auto idx() {
+        return idx_;
+    }
+
+    auto name() {
+        return result_.data_.name(idx_);
+    }
 
 }
 
-
-struct BasicRowSet(D,P) {
+struct BasicRowSet(D, P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Row = BasicRow!(Driver,Policy);
-    alias ColumnSet = BasicColumnSet!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
+    alias Row = BasicRow!(Driver, Policy);
+    alias ColumnSet = BasicColumnSet!(Driver, Policy);
 
     void rowSetTag();
 
@@ -455,21 +556,25 @@ struct BasicRowSet(D,P) {
         result_ = result;
     }
 
-    int width() {return result_.data_.columns;}
+    int width() {
+        return result_.data_.columns;
+    }
 
     // length will be for the number of rows (if defined)
     int length() {
         throw new Exception("not a completed/detached rowSet");
     }
 
-    auto into(A...) (ref A args) {
-        if (!result_.rowsFetched()) throw new DatabaseException("no data");
+    auto into(A...)(ref A args) {
+        if (!result_.rowsFetched())
+            throw new DatabaseException("no data");
         auto row = front();
-        foreach(i, ref a; args) {
+        foreach (i, ref a; args) {
             alias T = A[i];
             static if (is(T == string)) {
                 a = row[i].as!T.dup;
-            } else {
+            }
+            else {
                 a = row[i].as!T;
             }
         }
@@ -481,43 +586,53 @@ struct BasicRowSet(D,P) {
         return this;
     }
 
-
     // into for output range: experimental
     //if (isOutputRange!(R,E))
-    auto into(R) (R range) 
-        if (hasMember!(R, "put")) {
-            // Row should have range
-            // needs lots of work
-            auto row = Row(this);
-            for(int i=0; i != width; i++) {
-                auto f = row[i];
-                switch (f.type) {
-                    case ValueType.Int: put(range, f.as!int); break;
-                    case ValueType.String: put(range, f.as!string); break;
-                                           //case ValueType.Date: put(range, f.as!Date); break;
-                    default: throw new DatabaseException("switch error");
-                }
+    auto into(R)(R range) if (hasMember!(R, "put")) {
+        // Row should have range
+        // needs lots of work
+        auto row = Row(this);
+        for (int i = 0; i != width; i++) {
+            auto f = row[i];
+            switch (f.type) {
+            case ValueType.Int:
+                put(range, f.as!int);
+                break;
+            case ValueType.String:
+                put(range, f.as!string);
+                break;
+                //case ValueType.Date: put(range, f.as!Date); break;
+            default:
+                throw new DatabaseException("switch error");
             }
         }
+    }
 
     auto columns() {
         return ColumnSet(result_);
     }
 
+    bool empty() {
+        return result_.rowsFetched_ == 0;
+    }
 
-    bool empty() {return result_.rowsFetched_ == 0;}
-    auto front() {return Row(this);}
-    void popFront() {result_.next();}
+    auto front() {
+        return Row(this);
+    }
+
+    void popFront() {
+        result_.next();
+    }
 }
 
-struct BasicRow(D,P) {
+struct BasicRow(D, P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
-    alias Value = BasicValue!(Driver,Policy);
-    alias Column = BasicColumn!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
+    alias RowSet = BasicRowSet!(Driver, Policy);
+    alias Cell = BasicCell!(Driver, Policy);
+    alias Value = BasicValue!(Driver, Policy);
+    alias Column = BasicColumn!(Driver, Policy);
 
     private RowSet rows_;
 
@@ -525,14 +640,18 @@ struct BasicRow(D,P) {
         rows_ = rows;
     }
 
-    int width() {return rows_.result_.data_.columns;}
+    int width() {
+        return rows_.result_.data_.columns;
+    }
 
-    auto into(A...) (ref A args) {
+    auto into(A...)(ref A args) {
         rows_.into(args);
         return this;
     }
 
-    auto opIndex(Column column) {return opIndex(column.idx);}
+    auto opIndex(Column column) {
+        return opIndex(column.idx);
+    }
 
     // experimental
     auto opDispatch(string s)() {
@@ -543,162 +662,188 @@ struct BasicRow(D,P) {
         auto result = &rows_.result_;
         // needs work
         // sending a ptr to cell instead of reference (dangerous)
-		return Value(Cell(result, &result.data_.bind[idx], idx));
+        return Value(Cell(result, &result.data_.bind[idx], idx));
     }
 }
 
-
-struct BasicValue(D,P) {
+struct BasicValue(D, P) {
     alias Driver = D;
     alias Policy = P;
     //alias Result = Driver.Result;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
+    alias Cell = BasicCell!(Driver, Policy);
     alias Bind = Driver.Bind;
     private Cell cell_;
-	private Variant data_;
-    alias Converter = .Converter!(Driver,Policy);
+    private Variant data_;
+    alias Converter = .Converter!(Driver, Policy);
 
     this(Cell cell) {
         cell_ = cell;
-		data_ = resultPtr.getValue(&cell_);
+        data_ = resultPtr.getValue(&cell_);
     }
 
     private auto resultPtr() {
-		auto r = cell_.result_;
-		return &(r.result()); // last parens matter here (something about delegate)
+        auto r = cell_.result_;
+        return &(r.result()); // last parens matter here (something about delegate)
     }
 
-	Variant value(){return data_;}
+    Variant value() {
+        return data_;
+    }
 
-	ubyte[] rawData(){return resultPtr.rawData(&cell_);}
+    ubyte[] rawData() {
+        return resultPtr.rawData(&cell_);
+    }
 
-    auto type() {return cell_.bind.type;}
+    auto type() {
+        return cell_.bind.type;
+    }
 
-	auto as(T)(){return data_.coerce!T();}
+    auto as(T)() {
+        return data_.coerce!T();
+    }
 
-	auto as(T:Variant)() {return data_;}//Converter.convert!T(resultPtr, cell_);}
+    auto as(T : Variant)() {
+        return data_;
+    } //Converter.convert!T(resultPtr, cell_);}
 
-	bool isNull() {return resultPtr.isNull(&cell_);} //fix
+    bool isNull() {
+        return resultPtr.isNull(&cell_);
+    } //fix
 
-    string name() {return resultPtr.name(cell_.idx_);}
+    string name() {
+        return resultPtr.name(cell_.idx_);
+    }
 
-	auto get(T)() {if(data_.convertsTo!T()) return Nullable!T(as!T); else return Nullable!T;}
+    auto get(T)() {
+        if (data_.convertsTo!T())
+            return Nullable!T(as!T);
+        else
+            return Nullable!T;
+    }
 
     // not sure if this does anything
     //const(char)[] chars() {return as!string;}
 
-	string toString() {return data_.toString();}
+    string toString() {
+        return data_.toString();
+    }
 
 }
 
-struct BasicCell(D,P) {
+struct BasicCell(D, P) {
     alias Driver = D;
     alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
+    alias Result = BasicResult!(Driver, Policy);
     alias Bind = Driver.Bind;
-	alias Value = BasicValue!(Driver,Policy);
+    alias Value = BasicValue!(Driver, Policy);
     private Bind* bind_;
     private int rowIdx_;
     private size_t idx_;
-	private Result * result_;
+    private Result* result_;
 
-    this(Result *r, Bind *b, size_t idx) {
+    this(Result* r, Bind* b, size_t idx) {
         bind_ = b;
-		result_ = r;
+        result_ = r;
         rowIdx_ = r.rowIdx_;
         idx_ = idx;
     }
 
-	private auto resultPtr() {
-		return &result_.result(); // last parens matter here (something about delegate)
-	}
+    private auto resultPtr() {
+        return &result_.result(); // last parens matter here (something about delegate)
+    }
 
-	auto value(){return Value(this);}
+    auto value() {
+        return Value(this);
+    }
 
-    auto bind() {return bind_;}
-    auto rowIdx() {return rowIdx_;}
+    auto bind() {
+        return bind_;
+    }
+
+    auto rowIdx() {
+        return rowIdx_;
+    }
 }
 
 //Converter now is not used, but if del it ,it will build error.
-struct Converter(D,P) {
+struct Converter(D, P) {
     alias Driver = D;
     alias Policy = P;
     alias Result = Driver.Result;
-//    alias Bind = Driver.Bind;
-    alias Cell = BasicCell!(Driver,Policy);
+    //    alias Bind = Driver.Bind;
+    alias Cell = BasicCell!(Driver, Policy);
 
- //   static Y convert(Y)(Result *r, ref Cell cell) {
-      /*  ValueType x = cell.bind.type, y = TypeInfo!Y.type;
+    //   static Y convert(Y)(Result *r, ref Cell cell) {
+    /*  ValueType x = cell.bind.type, y = TypeInfo!Y.type;
         if (x == y) return r.get!Y(&cell); // temporary
         auto e = lookup(x,y);
         if (!e) conversionError(x,y);
         Y value;
         e.convert(r, &cell, &value);*/
-//        return Y.init;
-//    }
+    //        return Y.init;
+    //    }
 
- //   static Y convert(Y:Variant)(Result *r, ref Cell cell) {
-        //return Y(123);
-       /* ValueType x = cell.bind.type, y = ValueType.Variant;
+    //   static Y convert(Y:Variant)(Result *r, ref Cell cell) {
+    //return Y(123);
+    /* ValueType x = cell.bind.type, y = ValueType.Variant;
         auto e = lookup(x,y);
         if (!e) conversionError(x,y);
         Y value;
         e.convert(r, &cell, &value);*/
-//		return Variant();
- //   }
+    //		return Variant();
+    //   }
 
- //   static Y convertDirect(Y)(Result *r, ref Cell cell) {
-      //  assert(b.type == TypeInfo!Y.type);
-//		return Y.init;//return r.get!Y(&cell);
- //   }
+    //   static Y convertDirect(Y)(Result *r, ref Cell cell) {
+    //  assert(b.type == TypeInfo!Y.type);
+    //		return Y.init;//return r.get!Y(&cell);
+    //   }
 
- //  private:
+    //  private:
 
     struct Elem {
-        ValueType from,to;
-        void function(Result*,void*,void*) convert;
+        ValueType from, to;
+        void function(Result*, void*, void*) convert;
     }
 
     // only cross converters, todo: all converters
-    static Elem[1] converters = [
-   // {from: ValueType.Int, to: ValueType.String, &generate!(int,string).convert},
-   // {from: ValueType.String, to: ValueType.Int, &generate!(string,int).convert},
+    static Elem[1] converters = [// {from: ValueType.Int, to: ValueType.String, &generate!(int,string).convert},
+    // {from: ValueType.String, to: ValueType.Int, &generate!(string,int).convert},
     //{from: ValueType.Date, to: ValueType.String, &generate!(Date,string).convert},
     // variants
-    {from: ValueType.Int, to: ValueType.Variant, &generate!(int,Variant).convert},
-    //{from: ValueType.String, to: ValueType.Variant, &generate!(string,Variant).convert},
-    //{from: ValueType.Date, to: ValueType.Variant, &generate!(Date,Variant).convert},
-    ];
+    {
+    from:
+        ValueType.Int, to : ValueType.Variant, &generate!(int, Variant).convert},//{from: ValueType.String, to: ValueType.Variant, &generate!(string,Variant).convert},
+        //{from: ValueType.Date, to: ValueType.Variant, &generate!(Date,Variant).convert},
+        ];
 
-  //  static Elem* lookup(ValueType x, ValueType y) {
+        //  static Elem* lookup(ValueType x, ValueType y) {
         // rework into efficient array lookup
-    //    foreach(ref i; converters) {
-     //       if (i.from == x && i.to == y) return &i;
-      //  }
-   //     return null;
-  //  }
+        //    foreach(ref i; converters) {
+        //       if (i.from == x && i.to == y) return &i;
+        //  }
+        //     return null;
+        //  }
 
-    struct generate(X,Y) {
-        static void convert(Result *r, void *x_, void *y_) {
-           // import std.conv;
-            Cell* cell = cast(Cell*) x_;
-           // *cast(Y*) y_ = to!Y(r.get!X(cell));
+        struct generate(X, Y) {
+            static void convert(Result* r, void* x_, void* y_) {
+                // import std.conv;
+                Cell* cell = cast(Cell*) x_;
+                // *cast(Y*) y_ = to!Y(r.get!X(cell));
+            }
         }
+
+        //   struct generate(X,Y:Variant) {
+        //      static void convert(Result *r, void *x_, void *y_) {
+        // Cell* cell = cast(Cell*) x_;
+        // *cast(Y*) y_ = r.get!X(cell);
+        //      }
+        //  }
+
+        //   static void conversionError(ValueType x, ValueType y) {
+        //       import std.conv;
+        //       string msg;
+        //       msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
+        //       throw new DatabaseException(msg);
+        //   }
     }
-
- //   struct generate(X,Y:Variant) {
- //      static void convert(Result *r, void *x_, void *y_) {
-           // Cell* cell = cast(Cell*) x_;
-           // *cast(Y*) y_ = r.get!X(cell);
-  //      }
- //  }
-
- //   static void conversionError(ValueType x, ValueType y) {
- //       import std.conv;
- //       string msg;
- //       msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
- //       throw new DatabaseException(msg);
- //   }
-}
-

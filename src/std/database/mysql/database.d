@@ -7,18 +7,14 @@ import std.stdio;
 import std.database.common;
 import std.database.source;
 
-version (Windows)
-{
+version (Windows) {
     pragma(lib, "libmysql");
 }
-else
-{
-    version (webscalesql)
-    {
+else {
+    version (webscalesql) {
         pragma(lib, "webscalesql");
     }
-    else
-    {
+    else {
         pragma(lib, "mysqlclient");
     }
 }
@@ -37,72 +33,60 @@ alias Database(T) = BasicDatabase!(Driver!T.Sync, T);
 
 alias AsyncDatabase(T) = BasicDatabase!(Driver!T.Async, T);
 
-struct DefaultPolicy
-{
+struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-auto createDatabase()(string uri = "")
-{
+auto createDatabase()(string uri = "") {
     return Database!DefaultPolicy(uri);
 }
 
-auto createDatabase(T)(string uri = "")
-{
+auto createDatabase(T)(string uri = "") {
     return Database!T(uri);
 }
 
-private static bool isError()(int ret)
-{
+private static bool isError()(int ret) {
     return !(ret == 0 || ret == MYSQL_NO_DATA || ret == MYSQL_DATA_TRUNCATED);
 }
 
-private static T* check(T)(string msg, T* ptr)
-{
+private static T* check(T)(string msg, T* ptr) {
     info(msg, ":", ptr);
     if (!ptr)
         raiseError(msg);
     return ptr;
 }
 
-private static int check()(string msg, MYSQL_STMT* stmt, int ret)
-{
+private static int check()(string msg, MYSQL_STMT* stmt, int ret) {
     info(msg, ":", ret);
     if (isError(ret))
         raiseError(msg, stmt, ret);
     return ret;
 }
 
-private static void raiseError()(string msg)
-{
+private static void raiseError()(string msg) {
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
-private static void raiseError()(string msg, int ret)
-{
+private static void raiseError()(string msg, int ret) {
     throw new DatabaseException("mysql error: status: " ~ to!string(ret) ~ ":" ~ msg);
 }
 
-private static void raiseError()(string msg, MYSQL_STMT* stmt, int ret)
-{
+private static void raiseError()(string msg, MYSQL_STMT* stmt, int ret) {
     import core.stdc.string : strlen;
 
     const(char*) err = mysql_stmt_error(stmt);
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
-private struct Driver(Policy)
-{
+private struct Driver(Policy) {
 
-    struct Describe
-    {
+    struct Describe {
         int index;
         immutable(char)[] name;
         MYSQL_FIELD* field;
     }
 
-    struct Bind
-    {
+    struct Bind {
         ValueType type;
         int mysql_type;
         int allocSize;
@@ -112,8 +96,7 @@ private struct Driver(Policy)
         my_bool error;
     }
 
-    struct Sync
-    {
+    struct Sync {
         alias Allocator = Policy.Allocator;
         alias Cell = BasicCell!(Sync, Policy);
         alias const(ubyte)* cstring;
@@ -121,8 +104,7 @@ private struct Driver(Policy)
         alias Describe = Driver!Policy.Describe;
         alias Bind = Driver!Policy.Bind;
 
-        struct Database
-        {
+        struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;
 
             static const FeatureArray features = [Feature.InputBinding, Feature.DateBinding,
@@ -131,25 +113,21 @@ private struct Driver(Policy)
 
             Allocator allocator;
 
-            this(string uri)
-            {
+            this(string uri) {
                 allocator = Allocator();
                 info("mysql client info: ", to!string(mysql_get_client_info()));
             }
 
-            ~this()
-            {
+            ~this() {
                 log("~Database");
             }
         }
 
-        struct Connection
-        {
+        struct Connection {
             Database* db;
             MYSQL* mysql;
 
-            this(Database* db_, Source source)
-            {
+            this(Database* db_, Source source) {
                 db = db_;
 
                 mysql = check("mysql_init", mysql_init(null));
@@ -161,8 +139,7 @@ private struct Driver(Policy)
                     cast(cstring) toStringz(source.database), 0, null, 0));
             }
 
-            ~this()
-            {
+            ~this() {
                 log("~Statement");
                 if (mysql)
                     mysql_close(mysql);
@@ -171,18 +148,16 @@ private struct Driver(Policy)
 
         }
 
-        static void bindSetup(ref Array!Bind bind, ref Array!MYSQL_BIND mysqlBind)
-        {
+        static void bindSetup(ref Array!Bind bind, ref Array!MYSQL_BIND mysqlBind) {
             // make this efficient
             mysqlBind.clear();
             mysqlBind.reserve(bind.length);
-            for (int i = 0; i != bind.length; ++i)
-            {
+            for (int i = 0; i != bind.length; ++i) {
                 mysqlBind ~= MYSQL_BIND();
                 auto b = &bind[i];
                 auto mb = &mysqlBind[i];
-				//import core.stdc.string: memset;
-				//memset(mb, 0, MYSQL_BIND.sizeof); // might not be needed: D struct
+                //import core.stdc.string: memset;
+                //memset(mb, 0, MYSQL_BIND.sizeof); // might not be needed: D struct
                 mb.buffer_type = b.mysql_type;
                 mb.buffer = b.data.ptr;
                 mb.buffer_length = b.allocSize;
@@ -192,8 +167,7 @@ private struct Driver(Policy)
             }
         }
 
-        struct Statement
-        {
+        struct Statement {
             Connection* con;
             string sql;
             Allocator* allocator;
@@ -203,16 +177,14 @@ private struct Driver(Policy)
             Array!MYSQL_BIND mysqlBind;
             bool bindInit;
 
-            this(Connection* con_, string sql_)
-            {
+            this(Connection* con_, string sql_) {
                 con = con_;
                 sql = sql_;
                 allocator = &con.db.allocator;
                 stmt = check("mysql_stmt_init", mysql_stmt_init(con.mysql));
             }
 
-            ~this()
-            {
+            ~this() {
                 log("~Statement");
                 foreach (b; inputBind)
                     allocator.deallocate(b.data);
@@ -222,28 +194,23 @@ private struct Driver(Policy)
             }
 
             // hoist?
-            this(this)
-            {
+            this(this) {
                 assert(false);
             }
 
-            void opAssign(Statement rhs)
-            {
+            void opAssign(Statement rhs) {
                 assert(false);
             }
 
-            void prepare()
-            {
+            void prepare() {
                 check("mysql_stmt_prepare", stmt, mysql_stmt_prepare(stmt,
                     cast(char*) sql.ptr, sql.length));
 
                 binds = cast(uint) mysql_stmt_param_count(stmt);
             }
 
-            void query()
-            {
-                if (inputBind.length && !bindInit)
-                {
+            void query() {
+                if (inputBind.length && !bindInit) {
                     bindInit = true;
 
                     bindSetup(inputBind, mysqlBind);
@@ -256,30 +223,25 @@ private struct Driver(Policy)
                 check("mysql_stmt_execute", stmt, mysql_stmt_execute(stmt));
             }
 
-            void query(X...)(X args)
-            {
+            void query(X...)(X args) {
                 bindAll(args);
                 query();
             }
 
-            bool hasRows()
-            {
+            bool hasRows() {
                 return true;
             }
 
-            void reset()
-            {
+            void reset() {
             }
 
-            private void bindAll(T...)(T args)
-            {
+            private void bindAll(T...)(T args) {
                 int col;
                 foreach (arg; args)
                     bind(++col, arg);
             }
 
-            void bind(int n, int value)
-            {
+            void bind(int n, int value) {
                 info("input bind: n: ", n, ", value: ", value);
                 auto b = bindAlloc(n, MYSQL_TYPE_LONG, int.sizeof);
                 b.is_null = 0;
@@ -288,8 +250,7 @@ private struct Driver(Policy)
 
             }
 
-            void bind(int n, const char[] value)
-            {
+            void bind(int n, const char[] value) {
                 import core.stdc.string : strncpy;
 
                 info("input bind: n: ", n, ", value: ", value);
@@ -304,8 +265,7 @@ private struct Driver(Policy)
                 b.length = value.length;
             }
 
-            void bind(int n, Date d)
-            {
+            void bind(int n, Date d) {
                 auto b = bindAlloc(n, MYSQL_TYPE_DATE, MYSQL_TIME.sizeof);
                 b.is_null = 0;
                 b.error = 0;
@@ -316,8 +276,7 @@ private struct Driver(Policy)
                 p.day = d.day;
             }
 
-            Bind* bindAlloc(int n, int mysql_type, int allocSize)
-            {
+            Bind* bindAlloc(int n, int mysql_type, int allocSize) {
                 if (n == 0)
                     throw new DatabaseException("zero index");
                 auto idx = n - 1;
@@ -336,8 +295,7 @@ private struct Driver(Policy)
 
         }
 
-        struct Result
-        {
+        struct Result {
             Statement* stmt;
             Allocator* allocator;
             uint columns;
@@ -349,8 +307,7 @@ private struct Driver(Policy)
 
             static const maxData = 256;
 
-            this(Statement* stmt_, int rowArraySize_)
-            {
+            this(Statement* stmt_, int rowArraySize_) {
                 stmt = stmt_;
                 allocator = stmt.allocator;
 
@@ -363,8 +320,7 @@ private struct Driver(Policy)
                 build_bind();
             }
 
-            ~this()
-            {
+            ~this() {
                 log("~Result");
                 foreach (b; bind)
                     allocator.deallocate(b.data);
@@ -373,16 +329,14 @@ private struct Driver(Policy)
                 log("~Result");
             }
 
-            void build_describe()
-            {
+            void build_describe() {
                 import core.stdc.string : strlen;
 
                 columns = cast(uint) mysql_stmt_field_count(stmt.stmt);
 
                 describe.reserve(columns);
 
-                for (int i = 0; i != columns; ++i)
-                {
+                for (int i = 0; i != columns; ++i) {
                     describe ~= Describe();
                     auto d = &describe.back();
 
@@ -396,22 +350,19 @@ private struct Driver(Policy)
                 }
             }
 
-            void build_bind()
-            {
+            void build_bind() {
                 import core.stdc.string : memset;
                 import core.memory : GC;
 
                 bind.reserve(columns);
 
-                for (int i = 0; i != columns; ++i)
-                {
+                for (int i = 0; i != columns; ++i) {
                     auto d = &describe[i];
                     bind ~= Bind();
                     auto b = &bind.back();
                     b.mysql_type = d.field.type;
-					b.allocSize = cast(uint)(d.field.length + 1);
-                    switch (d.field.type)
-                    {
+                    b.allocSize = cast(uint)(d.field.length + 1);
+                    switch (d.field.type) {
                     case MYSQL_TYPE_TINY:
                         b.type = ValueType.Char;
                         break;
@@ -437,19 +388,19 @@ private struct Driver(Policy)
                     case MYSQL_TYPE_TIME:
                     case MYSQL_TYPE_TIME2:
                         b.type = ValueType.Time;
-						b.allocSize += 30;
+                        b.allocSize += 30;
                         break;
                     case MYSQL_TYPE_DATETIME2:
                     case MYSQL_TYPE_DATETIME:
                     case MYSQL_TYPE_TIMESTAMP2:
                     case MYSQL_TYPE_TIMESTAMP:
                         b.type = ValueType.DateTime;
-						b.allocSize += 30;
+                        b.allocSize += 30;
                         break;
                     default:
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
-						b.allocSize += 256;
+                        b.allocSize += 256;
                         break;
 
                     }
@@ -472,25 +423,20 @@ private struct Driver(Policy)
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
 
-            bool hasResult()
-            {
+            bool hasResult() {
                 return result_metadata != null;
             }
 
-            int fetch()
-            {
+            int fetch() {
                 status = check("mysql_stmt_fetch", stmt.stmt, mysql_stmt_fetch(stmt.stmt));
-                if (!status)
-                {
+                if (!status) {
                     return 1;
                 }
-                else if (status == MYSQL_NO_DATA)
-                {
+                else if (status == MYSQL_NO_DATA) {
                     //rows_ = row_count_;
                     return 0;
                 }
-                else if (status == MYSQL_DATA_TRUNCATED)
-                {
+                else if (status == MYSQL_DATA_TRUNCATED) {
                     raiseError("mysql_stmt_fetch: truncation", status);
                 }
 
@@ -500,68 +446,56 @@ private struct Driver(Policy)
 
             // value getters
 
-            Variant getValue(Cell* cell)
-            {
+            Variant getValue(Cell* cell) {
                 Variant value;
-                switch (cell.bind.type)
-                {
-                case ValueType.Char:
-                    {
+                switch (cell.bind.type) {
+                case ValueType.Char: {
                         auto t = (*cast(char*) cell.bind.data.ptr);
                         value = t;
                     }
                     break;
-                case ValueType.Short:
-                    {
+                case ValueType.Short: {
                         auto t = (*cast(short*) cell.bind.data.ptr);
                         value = t;
 
                     }
                     break;
-                case ValueType.Int:
-                    {
+                case ValueType.Int: {
                         auto t = (*cast(int*) cell.bind.data.ptr);
                         value = t;
                     }
                     break;
-                case ValueType.Long:
-                    {
+                case ValueType.Long: {
                         auto t = (*cast(long*) cell.bind.data.ptr);
                         value = t;
                     }
                     break;
-                case ValueType.Float:
-                    {
+                case ValueType.Float: {
                         auto t = (*cast(float*) cell.bind.data.ptr);
                         value = t;
                     }
                     break;
-                case ValueType.Double:
-                    {
+                case ValueType.Double: {
                         auto t = (*cast(double*) cell.bind.data.ptr);
                         value = t;
                     }
                     break;
-                case ValueType.String:
-                    {
+                case ValueType.String: {
                         auto ptr = cast(char*) cell.bind.data.ptr;
                         value = cast(string)(ptr[0 .. cell.bind.length]);
                     }
                     break;
-                case ValueType.Date:
-                    {
+                case ValueType.Date: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = Date(t.year, t.month, t.day);
                     }
                     break;
-                case ValueType.Time:
-                    {
+                case ValueType.Time: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = Time(t.hour, t.minute, t.second);
                     }
                     break;
-                case ValueType.DateTime:
-                    {
+                case ValueType.DateTime: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = DateTime(t.year, t.month, t.day, t.hour, t.minute,
                             t.second);
@@ -579,25 +513,22 @@ private struct Driver(Policy)
                return ptr[0..b.length];
                }
              */
-            ubyte[] rawData(Cell* cell)
-            {
-				log("-----------bind.bufferLength = ", cell.bind.allocSize , " , dataLength = ", cell.bind.length);
+            ubyte[] rawData(Cell* cell) {
+                log("-----------bind.bufferLength = ", cell.bind.allocSize,
+                    " , dataLength = ", cell.bind.length);
                 auto ptr = cast(ubyte*) cell.bind.data.ptr;
-				return ptr[0 .. cell.bind.length];
+                return ptr[0 .. cell.bind.length];
             }
 
-            bool isNull(Cell* cell)
-            {
+            bool isNull(Cell* cell) {
                 return cell.bind.is_null > 0;
             }
 
-            auto name(size_t idx)
-            {
+            auto name(size_t idx) {
                 return describe[idx].name;
             }
 
-            static void checkType(T)(Bind* b)
-            {
+            static void checkType(T)(Bind* b) {
                 int x = TypeInfo!T.type();
                 int y = b.mysql_type;
                 if (x == y)
@@ -607,26 +538,20 @@ private struct Driver(Policy)
             }
 
             // refactor as a better 1-n bind mapping
-            struct TypeInfo(T : int)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : int) {
+                static int type() {
                     return MYSQL_TYPE_LONG;
                 }
             }
 
-            struct TypeInfo(T : string)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : string) {
+                static int type() {
                     return MYSQL_TYPE_STRING;
                 }
             }
 
-            struct TypeInfo(T : Date)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : Date) {
+                static int type() {
                     return MYSQL_TYPE_DATE;
                 }
             }
@@ -634,49 +559,41 @@ private struct Driver(Policy)
         }
     }
 
-    struct Async
-    {
+    struct Async {
         alias Allocator = Policy.Allocator;
         alias Describe = Driver!Policy.Describe;
         alias Bind = Driver!Policy.Bind;
         alias Cell = BasicCell!(Async, Policy);
 
-        struct Database
-        {
+        struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;
 
             static const FeatureArray features = [Feature.InputBinding, Feature.DateBinding,
                 //Feature.ConnectionPool,
                 ];
 
-            this(string defaultURI)
-            {
+            this(string defaultURI) {
                 info("mysql client info: ", to!string(mysql_get_client_info()));
             }
 
-            bool bindable()
-            {
+            bool bindable() {
                 return true;
             }
 
-            bool dateBinding()
-            {
+            bool dateBinding() {
                 return true;
             }
 
-            bool poolEnable()
-            {
+            bool poolEnable() {
                 return false;
             }
         }
 
-        struct Connection
-        {
+        struct Connection {
             Database* db;
             MYSQL* mysql;
 
-            this(Database* db_, Source source)
-            {
+            this(Database* db_, Source source) {
                 db = db_;
 
                 mysql = check("mysql_init", mysql_init(null));
@@ -688,8 +605,7 @@ private struct Driver(Policy)
                     cast(cstring) toStringz(source.database), 0, null, 0));
             }
 
-            ~this()
-            {
+            ~this() {
                 log("~Statement");
                 if (mysql)
                     mysql_close(mysql);
@@ -698,13 +614,11 @@ private struct Driver(Policy)
 
         }
 
-        static void bindSetup(ref Array!Bind bind, ref Array!MYSQL_BIND mysqlBind)
-        {
+        static void bindSetup(ref Array!Bind bind, ref Array!MYSQL_BIND mysqlBind) {
             // make this efficient
             mysqlBind.clear();
             mysqlBind.reserve(bind.length);
-            for (int i = 0; i != bind.length; ++i)
-            {
+            for (int i = 0; i != bind.length; ++i) {
                 mysqlBind ~= MYSQL_BIND();
                 //import core.stdc.string: memset;
                 //memset(mb, 0, MYSQL_BIND.sizeof); // might not be needed: D struct
@@ -719,8 +633,7 @@ private struct Driver(Policy)
             }
         }
 
-        struct Statement
-        {
+        struct Statement {
             Connection* con;
             string sql;
             Allocator allocator;
@@ -730,8 +643,7 @@ private struct Driver(Policy)
             Array!MYSQL_BIND mysqlBind;
             bool bindInit;
 
-            this(Connection* con_, string sql_)
-            {
+            this(Connection* con_, string sql_) {
                 con = con_;
                 sql = sql_;
                 //allocator = &con.db.allocator;
@@ -740,8 +652,7 @@ private struct Driver(Policy)
                     throw new DatabaseException("stmt error");
             }
 
-            ~this()
-            {
+            ~this() {
                 foreach (b; inputBind)
                     allocator.deallocate(b.data);
                 if (stmt)
@@ -750,28 +661,23 @@ private struct Driver(Policy)
             }
 
             // hoist?
-            this(this)
-            {
+            this(this) {
                 assert(false);
             }
 
-            void opAssign(Statement rhs)
-            {
+            void opAssign(Statement rhs) {
                 assert(false);
             }
 
-            void prepare()
-            {
+            void prepare() {
                 check("mysql_stmt_prepare", stmt, mysql_stmt_prepare(stmt,
                     cast(char*) sql.ptr, sql.length));
 
                 binds = cast(uint) mysql_stmt_param_count(stmt);
             }
 
-            void query()
-            {
-                if (inputBind.length && !bindInit)
-                {
+            void query() {
+                if (inputBind.length && !bindInit) {
                     bindInit = true;
 
                     bindSetup(inputBind, mysqlBind);
@@ -784,30 +690,25 @@ private struct Driver(Policy)
                 check("mysql_stmt_execute", stmt, mysql_stmt_execute(stmt));
             }
 
-            void query(X...)(X args)
-            {
+            void query(X...)(X args) {
                 bindAll(args);
                 query();
             }
 
-            bool hasRows()
-            {
+            bool hasRows() {
                 return true;
             }
 
-            void reset()
-            {
+            void reset() {
             }
 
-            private void bindAll(T...)(T args)
-            {
+            private void bindAll(T...)(T args) {
                 int col;
                 foreach (arg; args)
                     bind(++col, arg);
             }
 
-            void bind(int n, int value)
-            {
+            void bind(int n, int value) {
                 info("input bind: n: ", n, ", value: ", value);
                 auto b = bindAlloc(n, MYSQL_TYPE_LONG, int.sizeof);
                 b.is_null = 0;
@@ -816,8 +717,7 @@ private struct Driver(Policy)
 
             }
 
-            void bind(int n, const char[] value)
-            {
+            void bind(int n, const char[] value) {
                 import core.stdc.string : strncpy;
 
                 info("input bind: n: ", n, ", value: ", value);
@@ -832,8 +732,7 @@ private struct Driver(Policy)
                 b.length = value.length;
             }
 
-            void bind(int n, Date d)
-            {
+            void bind(int n, Date d) {
                 auto b = bindAlloc(n, MYSQL_TYPE_DATE, MYSQL_TIME.sizeof);
                 b.is_null = 0;
                 b.error = 0;
@@ -844,8 +743,7 @@ private struct Driver(Policy)
                 p.day = d.day;
             }
 
-            Bind* bindAlloc(int n, int mysql_type, int allocSize)
-            {
+            Bind* bindAlloc(int n, int mysql_type, int allocSize) {
                 if (n == 0)
                     throw new DatabaseException("zero index");
                 auto idx = n - 1;
@@ -864,8 +762,7 @@ private struct Driver(Policy)
 
         }
 
-        struct Result
-        {
+        struct Result {
             Statement* stmt;
             Allocator allocator;
             uint columns;
@@ -877,8 +774,7 @@ private struct Driver(Policy)
 
             static const maxData = 256;
 
-            this(Statement* stmt_, int rowArraySize_)
-            {
+            this(Statement* stmt_, int rowArraySize_) {
                 stmt = stmt_;
                 //allocator = stmt.allocator;
 
@@ -889,8 +785,7 @@ private struct Driver(Policy)
                 build_bind();
             }
 
-            ~this()
-            {
+            ~this() {
                 //log("~Result");
                 foreach (b; bind)
                     allocator.deallocate(b.data);
@@ -898,16 +793,14 @@ private struct Driver(Policy)
                     mysql_free_result(result_metadata);
             }
 
-            void build_describe()
-            {
+            void build_describe() {
                 import core.stdc.string : strlen;
 
                 columns = cast(uint) mysql_stmt_field_count(stmt.stmt);
 
                 describe.reserve(columns);
 
-                for (int i = 0; i < columns; ++i)
-                {
+                for (int i = 0; i < columns; ++i) {
                     describe ~= Describe();
                     auto d = &describe.back();
 
@@ -921,65 +814,62 @@ private struct Driver(Policy)
                 }
             }
 
-            void build_bind()
-            {
+            void build_bind() {
                 import core.stdc.string : memset;
                 import core.memory : GC;
 
                 bind.reserve(columns);
 
-				for (int i = 0; i != columns; ++i)
-				{
-					auto d = &describe[i];
-					bind ~= Bind();
-					auto b = &bind.back();
-					b.mysql_type = d.field.type;
-					b.allocSize = cast(uint)(d.field.length + 1);
-					switch (d.field.type)
-					{
-						case MYSQL_TYPE_TINY:
-							b.type = ValueType.Char;
-							break;
-						case MYSQL_TYPE_SHORT:
-							b.type = ValueType.Short;
-							break;
-						case MYSQL_TYPE_LONG:
-							b.type = ValueType.Int;
-							break;
-						case MYSQL_TYPE_LONGLONG:
-							b.type = ValueType.Long;
-							break;
-						case MYSQL_TYPE_FLOAT:
-							b.type = ValueType.Float;
-							break;
-						case MYSQL_TYPE_DOUBLE:
-							b.type = ValueType.Double;
-							break;
-							
-						case MYSQL_TYPE_DATE:
-							b.type = ValueType.Date;
-							break;
-						case MYSQL_TYPE_TIME:
-						case MYSQL_TYPE_TIME2:
-							b.type = ValueType.Time;
-							b.allocSize += 30;
-							break;
-						case MYSQL_TYPE_DATETIME2:
-						case MYSQL_TYPE_DATETIME:
-						case MYSQL_TYPE_TIMESTAMP2:
-						case MYSQL_TYPE_TIMESTAMP:
-							b.type = ValueType.DateTime;
-							b.allocSize += 30;
-							break;
-						default:
-							b.mysql_type = MYSQL_TYPE_STRING;
-							b.type = ValueType.String;
-							b.allocSize += 256;
-							break;
-							
-					}
-					// let in ints for now
-					/*    if (d.field.type == MYSQL_TYPE_LONG) {
+                for (int i = 0; i != columns; ++i) {
+                    auto d = &describe[i];
+                    bind ~= Bind();
+                    auto b = &bind.back();
+                    b.mysql_type = d.field.type;
+                    b.allocSize = cast(uint)(d.field.length + 1);
+                    switch (d.field.type) {
+                    case MYSQL_TYPE_TINY:
+                        b.type = ValueType.Char;
+                        break;
+                    case MYSQL_TYPE_SHORT:
+                        b.type = ValueType.Short;
+                        break;
+                    case MYSQL_TYPE_LONG:
+                        b.type = ValueType.Int;
+                        break;
+                    case MYSQL_TYPE_LONGLONG:
+                        b.type = ValueType.Long;
+                        break;
+                    case MYSQL_TYPE_FLOAT:
+                        b.type = ValueType.Float;
+                        break;
+                    case MYSQL_TYPE_DOUBLE:
+                        b.type = ValueType.Double;
+                        break;
+
+                    case MYSQL_TYPE_DATE:
+                        b.type = ValueType.Date;
+                        break;
+                    case MYSQL_TYPE_TIME:
+                    case MYSQL_TYPE_TIME2:
+                        b.type = ValueType.Time;
+                        b.allocSize += 30;
+                        break;
+                    case MYSQL_TYPE_DATETIME2:
+                    case MYSQL_TYPE_DATETIME:
+                    case MYSQL_TYPE_TIMESTAMP2:
+                    case MYSQL_TYPE_TIMESTAMP:
+                        b.type = ValueType.DateTime;
+                        b.allocSize += 30;
+                        break;
+                    default:
+                        b.mysql_type = MYSQL_TYPE_STRING;
+                        b.type = ValueType.String;
+                        b.allocSize += 256;
+                        break;
+
+                    }
+                    // let in ints for now
+                    /*    if (d.field.type == MYSQL_TYPE_LONG) {
                         b.mysql_type = d.field.type;
                         b.type = ValueType.Int;
                     } else if (d.field.type == MYSQL_TYPE_DATE) {
@@ -989,28 +879,24 @@ private struct Driver(Policy)
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
                     }*/
-					b.data = allocator.allocate(b.allocSize);
-				}
-				
-				bindSetup(bind, mysqlBind);
+                    b.data = allocator.allocate(b.allocSize);
+                }
+
+                bindSetup(bind, mysqlBind);
 
                 mysql_stmt_bind_result(stmt.stmt, &mysqlBind.front());
             }
 
-            int fetch()
-            {
+            int fetch() {
                 status = check("mysql_stmt_fetch", stmt.stmt, mysql_stmt_fetch(stmt.stmt));
-                if (!status)
-                {
+                if (!status) {
                     return 1;
                 }
-                else if (status == MYSQL_NO_DATA)
-                {
+                else if (status == MYSQL_NO_DATA) {
                     //rows_ = row_count_;
                     return 0;
                 }
-                else if (status == MYSQL_DATA_TRUNCATED)
-                {
+                else if (status == MYSQL_DATA_TRUNCATED) {
                     raiseError("mysql_stmt_fetch: truncation", status);
                 }
 
@@ -1018,11 +904,9 @@ private struct Driver(Policy)
                 return 0;
             }
 
-            Variant getValue(Cell* cell)
-            {
+            Variant getValue(Cell* cell) {
                 Variant value;
-                switch (cell.bind.type)
-                {
+                switch (cell.bind.type) {
                 case ValueType.Char:
                     value = (*cast(char*) cell.bind.data.ptr);
                     break;
@@ -1041,26 +925,22 @@ private struct Driver(Policy)
                 case ValueType.Double:
                     value = (*cast(double*) cell.bind.data.ptr);
                     break;
-                case ValueType.String:
-                    {
+                case ValueType.String: {
                         auto ptr = cast(char*) cell.bind.data.ptr;
                         value = cast(string)(ptr[0 .. cell.bind.length]);
                     }
                     break;
-                case ValueType.Date:
-                    {
+                case ValueType.Date: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = Date(t.year, t.month, t.day);
                     }
                     break;
-                case ValueType.Time:
-                    {
+                case ValueType.Time: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = Time(t.hour, t.minute, t.second);
                     }
                     break;
-                case ValueType.DateTime:
-                    {
+                case ValueType.DateTime: {
                         MYSQL_TIME* t = cast(MYSQL_TIME*) cell.bind.data.ptr;
                         value = DateTime(t.year, t.month, t.day, t.hour, t.minute,
                             t.second);
@@ -1074,24 +954,20 @@ private struct Driver(Policy)
 
             // value getters
 
-            auto name(size_t idx)
-            {
+            auto name(size_t idx) {
                 return describe[idx].name;
             }
 
-            ubyte[] rawData(Cell* cell)
-            {
+            ubyte[] rawData(Cell* cell) {
                 auto ptr = cast(ubyte*) cell.bind.data.ptr;
                 return ptr[0 .. cell.bind.length];
             }
 
-            bool isNull(Cell* cell)
-            {
+            bool isNull(Cell* cell) {
                 return cell.bind.is_null > 0;
             }
 
-            static void checkType(T)(Bind* b)
-            {
+            static void checkType(T)(Bind* b) {
                 int x = TypeInfo!T.type();
                 int y = b.mysql_type;
                 if (x == y)
@@ -1101,26 +977,20 @@ private struct Driver(Policy)
             }
 
             // refactor as a better 1-n bind mapping
-            struct TypeInfo(T : int)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : int) {
+                static int type() {
                     return MYSQL_TYPE_LONG;
                 }
             }
 
-            struct TypeInfo(T : string)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : string) {
+                static int type() {
                     return MYSQL_TYPE_STRING;
                 }
             }
 
-            struct TypeInfo(T : Date)
-            {
-                static int type()
-                {
+            struct TypeInfo(T : Date) {
+                static int type() {
                     return MYSQL_TYPE_DATE;
                 }
             }
