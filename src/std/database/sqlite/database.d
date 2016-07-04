@@ -213,7 +213,25 @@ struct Driver(Policy) {
             for (int i = 0; i < columns; ++i) {
                 bind ~= Bind();
                 auto b = &bind.back();
-                b.type = ValueType.String;
+			/*	switch (sqlite3_column_type(st_, i))
+				{
+					case SQLITE_INTEGER:
+						b.type = ValueType.Int;
+						break;
+					case SQLITE_FLOAT:
+						b.type = ValueType.Float;
+						break;
+					case SQLITE3_TEXT: {
+						b.type = ValueType.String;
+						break;
+					case SQLITE_BLOB:
+						b.type = ValueType.Raw;
+						break;
+					default:
+						b.type = ValueType.String;
+						break;
+				}*/
+				b.type = ValueType.String;
                 b.idx = i;
             }
         }
@@ -244,7 +262,9 @@ struct Driver(Policy) {
         }
 
         ubyte[] rawData(Cell* cell) {
-            return null; //TODO: fix
+			ubyte * bytes = cast(ubyte *)sqlite3_column_blob(rs, idx);
+			int len = sqlite3_column_bytes(rs, idx);
+			return bytes[0..len];
         }
 
         Variant getValue(Cell* cell) {
@@ -252,25 +272,34 @@ struct Driver(Policy) {
             int idx = cast(int) cell.bind.idx;
             switch (sqlite3_column_type(st_, idx)) {
             case SQLITE_INTEGER:
-                value = sqlite3_column_int(st_, idx);
+				value = sqlite3_column_int64(st_, idx);
+				cell.bind.type = ValueType.Long;
                 break;
             case SQLITE_FLOAT:
                 value = sqlite3_column_double(st_, idx);
+				cell.bind.type = ValueType.Double;
                 break;
             case SQLITE3_TEXT: {
                     import core.stdc.string : strlen;
 
-                    auto ptr = cast(immutable char*) sqlite3_column_text(st_,
-                        cast(int) cell.bind.idx);
-                    value = cast(string) ptr[0 .. strlen(ptr)]; // fix with length
+                    auto ptr = cast(immutable char*) sqlite3_column_text(st_,idx);
+					int len = sqlite3_column_bytes(rs, idx);
+                    value = cast(string) ptr[0 .. len]; // fix with length
+					cell.bind.type = ValueType.String;
                 }
                 break;
-            case SQLITE_BLOB:
+            case SQLITE_BLOB: {
+					ubyte * bytes = cast(ubyte *)sqlite3_column_blob(rs, idx);
+					int len = sqlite3_column_bytes(rs, idx);
+					value = bytes[0..len];
+					cell.bind.type = ValueType.Raw;
+				}
                 break;
             case SQLITE_NULL:
+				cell.bind.type = ValueType.Variant;
                 break;
             }
-            return value; //TODO:
+            return value; 
         }
 
         bool isNull(Cell* cell) {
