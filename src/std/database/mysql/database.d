@@ -448,7 +448,8 @@ private struct Driver(Policy) {
 
             Variant getValue(Cell* cell) {
                 Variant value;
-				if(isNull(cell)) return value;
+                if (isNull(cell))
+                    return value;
                 switch (cell.bind.type) {
                 case ValueType.Char: {
                         auto t = (*cast(char*) cell.bind.data.ptr);
@@ -907,7 +908,8 @@ private struct Driver(Policy) {
 
             Variant getValue(Cell* cell) {
                 Variant value;
-				if(isNull(cell)) return value;
+                if (isNull(cell))
+                    return value;
                 switch (cell.bind.type) {
                 case ValueType.Char:
                     value = (*cast(char*) cell.bind.data.ptr);
