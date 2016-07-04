@@ -420,15 +420,42 @@ struct Driver(Policy) {
                 b.type = ValueType.String;
                 b.idx = i;
                 switch (d.dbType) {
+					case CHAROID:
+						b.type = ValueType.Char;
+						break;
+				case TEXTOID:
+				case NAMEOID:
                 case VARCHAROID:
                     b.type = ValueType.String;
                     break;
+				case BOOLOID:
                 case INT4OID:
                     b.type = ValueType.Int;
                     break;
+				case INT2OID:
+						b.type = ValueType.Short;
+						break;
+				case INT8OID:
+					b.type = ValueType.Long;
+					break;
+					case FLOAT4OID:
+						b.type = ValueType.Float;
+						break;
+					case FLOAT8OID:
+						b.type = ValueType.Double;
+						break;
                 case DATEOID:
                     b.type = ValueType.Date;
                     break;
+				case TIMEOID:
+					b.type = ValueType.Time;
+					break;
+				case TIMESTAMPOID:
+						b.type = ValueType.DateTime;
+						break;
+				case BYTEAOID:
+						b.type = ValueType.Raw;
+						break;
                 default:
                     throw new DatabaseException("unsupported type");
                 }
@@ -506,20 +533,54 @@ struct Driver(Policy) {
         }
 
         Variant getValue(Cell* cell) {
+			import std.bitmanip;
+
             Variant value;
+			if(isNull(cell)) return value;
+
+			void * dt = data(cell.bind.idx);
+			int leng = len(cell.bind.idx);
             switch (type(cell.bind.idx)) {
             case VARCHAROID: {
-                    immutable char* ptr = cast(immutable char*) data(cell.bind.idx);
-                    value = cast(string) ptr[0 .. len(cell.bind.idx)];
+                    immutable char* ptr = cast(immutable char*) dt;
+                    value = cast(string) ptr[0 .. leng];
                 }
                 break;
+			case INT2OID:{
+					auto t = cast(ubyte *) dt;
+					ubyte[short.sizeof] data ;
+					data[] = t[0..short.sizeof];
+					value = bigEndianToNative!short(data);
+				}
+					break;
             case INT4OID: {
-                    import std.bitmanip;
-
-                    auto p = cast(ubyte*) data(cell.bind.idx);
-                    value = bigEndianToNative!int(p[0 .. int.sizeof]);
+					auto t = cast(ubyte *) dt;
+					ubyte[int.sizeof] data ;
+					data[] = t[0..int.sizeof];
+					value = bigEndianToNative!int(data);
                 }
                 break;
+			case INT8OID: {
+				auto t = cast(ubyte *) dt;
+				ubyte[long.sizeof] data ;
+				data[] = t[0..long.sizeof];
+				value = bigEndianToNative!long(data);
+			}
+					break;
+			case FLOAT4OID: {
+					auto t = cast(ubyte *) dt;
+					ubyte[float.sizeof] data ;
+					data[] = t[0..float.sizeof];
+					value = bigEndianToNative!float(data);
+			}
+					break;
+			case FLOAT8OID: {
+				auto t = cast(ubyte *) dt;
+				ubyte[double.sizeof] data ;
+				data[] = t[0..double.sizeof];
+				value = bigEndianToNative!double(data);
+			}
+					break;
             case DATEOID: {
                     import std.bitmanip;
 
@@ -531,12 +592,58 @@ struct Driver(Policy) {
                     value = Date(mdy[2], mdy[0], mdy[1]);
                 }
                 break;
+			case TIMESTAMPOID: {
+					import std.string;
+					immutable char* ptr = cast(immutable char*) dt;
+					auto str = cast(string) ptr[0 .. leng];
+					value = DateTime.fromISOExtString( str.translate( [ ' ': 'T' ] ).split( '.' ).front() );
+				}
+				break;
+			case TIMEOID:
+				{
+					immutable char* ptr = cast(immutable char*) dt;
+					auto str = cast(string) ptr[0 .. leng];
+					value = parseTimeoid(str);
+				}
+					break;
+			case BYTEAOID:
+				{
+					immutable char* ptr = cast(immutable char*) dt;
+					auto str = cast(string) ptr[0 .. leng];
+					value = byteaToUbytes(str);
+				}
+					break;
+			case CHAROID:
+				{
+					auto t = cast(char *) dt;
+					value = cast(char)(leng > 0 ? t[0] : 0x00);
+				}
+				break;
+			case BOOLOID:
+				{
+					immutable char* ptr = cast(immutable char*) dt;
+					auto str = cast(string) ptr[0 .. leng];
+					if( s == "true" || s == "t" || s == "1" )
+						value = true;
+					else if( s == "false" || s == "f" || s == "0" )
+						value = false;
+					else
+					{
+						auto t = cast(ubyte *) ptr;
+						ubyte[int.sizeof] data ;
+						data[] = t[0..int.sizeof];
+						value = (bigEndianToNative!int(data) > 0);
+					}
+				}
+				break;
+			default:
+				break;
             }
-            return value; //TODO:
+            return value;
         }
 
         bool isNull(Cell* cell) {
-            return false;
+			return PQgetisnull(res, row, cell.bind.idx) != 0;
         }
 
         void checkType(int a, int b) {
@@ -565,4 +672,55 @@ struct Driver(Policy) {
         }
 
     }
+}
+
+// the under is from ddbc:
+import core.vararg;
+import std.exception;
+import std.meta;
+import std.range.primitives;
+import std.traits;
+import std.format;
+
+Time parseTimeoid(const string timeoid)
+{
+	import std.format;
+	string input = timeoid.dup;
+	int hour, min, sec;
+	formattedRead(input, "%s:%s:%s", &hour, &min, &sec);
+	return Time(hour, min, sec);
+}
+
+ubyte[] byteaToUbytes(string s) {
+	if (s is null)
+		return null;
+	ubyte[] res;
+	bool lastBackSlash = 0;
+	foreach(ch; s) {
+		if (ch == '\\') {
+			if (lastBackSlash) {
+				res ~= '\\';
+				lastBackSlash = false;
+			} else {
+				lastBackSlash = true;
+			}
+		} else {
+			if (lastBackSlash) {
+				if (ch == '0') {
+					res ~= 0;
+				} else if (ch == 'r') {
+					res ~= '\r';
+				} else if (ch == 'n') {
+					res ~= '\n';
+				} else if (ch == 't') {
+					res ~= '\t';
+				} else {
+				}
+			} else {
+				res ~= cast(byte)ch;
+			}
+			lastBackSlash = false;
+		}
+	}
+	return res;
 }

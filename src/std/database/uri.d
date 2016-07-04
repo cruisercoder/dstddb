@@ -61,7 +61,8 @@ URI toURI(string str) {
         auto n = e[0..j], v = e[j+1..$];
         uri.query[n] ~= v; //needs url decoding
     }
-
+	trace("host is :", uri.host, " port is :", uri.port, " protool is  : ", uri.protocol);
+	trace("path is : ", uri.path);
     return uri;
 }
 
