@@ -296,7 +296,7 @@ struct Driver(Policy) {
 				}
                 break;
             case SQLITE_NULL:
-				cell.bind.type = ValueType.Variant;
+				cell.bind.type = ValueType.String;
                 break;
             }
             return value; 

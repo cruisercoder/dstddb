@@ -40,6 +40,34 @@ struct Time {
     uint minute;
     uint second;
     uint msecond;
+
+	string toString(){
+		import std.string;
+		import std.format;
+		return format("%d:%d:%d.%d",hour,minute,second,msecond);
+	}
+
+	static Time formString(string str){
+		import std.string;
+		import std.array;
+		import std.conv;
+		int idx = cast(int)str.indexOf(".");
+		string dt;
+		uint msec = 0;
+		if(idx > 0)
+		{
+			dt = str[0..idx];
+			msec = to!uint(str[idx..$]);
+		}
+		else
+		{
+			dt = str;
+		}
+		string[] tm = dt.split(":");
+		if(tm.length != 3)
+			throw new Exception("erro string To Time : ", str);
+		return Time(to!uint(tm[0]),to!uint(tm[1]),to!uint(tm[2]),msec);
+	}
 }
 
 enum ValueType {
@@ -60,14 +88,45 @@ enum ValueType {
 
     Raw,
 
-    Variant //TODO: remove
+//    Variant //TODO: remove
+}
+// improve
+struct TypeInfo(T : char)
+{
+	static auto type() {
+		return ValueType.Char;
+	}
 }
 
-// improve
+struct TypeInfo(T : short)
+{
+	static auto type() {
+		return ValueType.Short;
+	}
+}
+
 struct TypeInfo(T : int) {
     static auto type() {
         return ValueType.Int;
     }
+}
+
+struct TypeInfo(T : long) {
+	static auto type() {
+		return ValueType.Long;
+	}
+}
+
+struct TypeInfo(T : float) {
+	static auto type() {
+		return ValueType.Float;
+	}
+}
+
+struct TypeInfo(T : double) {
+	static auto type() {
+		return ValueType.Double;
+	}
 }
 
 struct TypeInfo(T : string) {
@@ -82,11 +141,29 @@ struct TypeInfo(T : Date) {
     }
 }
 
-struct TypeInfo(T : Variant) {
+struct TypeInfo(T : Time) {
+	static auto type() {
+		return ValueType.Time;
+	}
+}
+
+struct TypeInfo(T : DateTime) {
+	static auto type() {
+		return ValueType.DateTime;
+	}
+}
+
+struct TypeInfo(T : ubyte[]) {
+	static auto type() {
+		return ValueType.Raw;
+	}
+}
+
+/*struct TypeInfo(T : Variant) {
     static auto type() {
         return ValueType.Variant;
     }
-}
+}*/
 
 enum Feature {
     InputBinding,
@@ -700,7 +777,7 @@ struct BasicValue(D, P) {
     }
 
     auto as(T)() {
-        return data_.coerce!T();
+		return Converter.convert!T(cell_,this);
     }
 
     auto as(T : Variant)() {
@@ -766,84 +843,328 @@ struct BasicCell(D, P) {
     }
 }
 
+/*
+struct EfficientValue(T) {
+	alias Driver = T.Driver;
+	alias Bind = Driver.Bind;
+	private Bind* bind_;
+	alias Converter = .Converter!Driver;
+
+	private Variant data_;
+	
+	this(Bind* bind) {bind_ = bind;}
+	
+	auto as(T:int)() {return Converter.convertDirect!T(bind_);}
+	auto as(T:string)() {return Converter.convertDirect!T(bind_);}
+	auto as(T:Date)() {return Converter.convertDirect!T(bind_);}
+	auto as(T:Variant)() {return Converter.convertDirect!T(bind_);}
+	
+}*/
+
+import std.traits;
 //Converter now is not used, but if del it ,it will build error.
-struct Converter(D, P) {
-    alias Driver = D;
-    alias Policy = P;
-    alias Result = Driver.Result;
-    //    alias Bind = Driver.Bind;
-    alias Cell = BasicCell!(Driver, Policy);
+struct Converter(D,P) {
+	alias Driver = D;
+	alias Policy = P;
+	//alias Result = Driver.Result;
+	alias Bind = Driver.Bind;
+	alias Cell = BasicCell!(Driver,Policy);
+	alias Value = Cell.Value;
 
-    //   static Y convert(Y)(Result *r, ref Cell cell) {
-    /*  ValueType x = cell.bind.type, y = TypeInfo!Y.type;
-        if (x == y) return r.get!Y(&cell); // temporary
-        auto e = lookup(x,y);
-        if (!e) conversionError(x,y);
-        Y value;
-        e.convert(r, &cell, &value);*/
-    //        return Y.init;
-    //    }
+	static Y convert(Y)(ref Cell cell,ref Value value) {
+		ValueType x = cell.bind.type, y = TypeInfo!Y.type;
+		if (x == y) return value.data_.get!Y(); 
+		auto e = lookup(x,y);
+		if (!e) conversionError(x,y);
+		Y val;
+		e.convert(&(value.data_),&cell, &val);
+		return val;
+	}
 
-    //   static Y convert(Y:Variant)(Result *r, ref Cell cell) {
-    //return Y(123);
-    /* ValueType x = cell.bind.type, y = ValueType.Variant;
-        auto e = lookup(x,y);
-        if (!e) conversionError(x,y);
-        Y value;
-        e.convert(r, &cell, &value);*/
-    //		return Variant();
-    //   }
+	private:
 
-    //   static Y convertDirect(Y)(Result *r, ref Cell cell) {
-    //  assert(b.type == TypeInfo!Y.type);
-    //		return Y.init;//return r.get!Y(&cell);
-    //   }
+	struct Elem {
+		ValueType from,to;
+		void function(Variant *,void *,void*) convert;
+	}
 
-    //  private:
+	// only cross converters, todo: all converters
+	static Elem[74] converters = [
+		//to string
+		{from: ValueType.Char, 		to: ValueType.String, &generate!(char,string).convert},
+		{from: ValueType.Short, 	to: ValueType.String, &generate!(short,string).convert},
+		{from: ValueType.Int, 		to: ValueType.String, &generate!(int,string).convert},
+		{from: ValueType.Long, 		to: ValueType.String, &generate!(int,string).convert},
+		{from: ValueType.Float, 	to: ValueType.String, &generate!(float,string).convert},
+		{from: ValueType.Double, 	to: ValueType.String, &generate!(double,string).convert},
+		{from: ValueType.Raw, 		to: ValueType.String, &generate!(ubyte[],string).convert},
+		{from: ValueType.Time, 		to: ValueType.String, &generate!(Time,string).convert},
+		{from: ValueType.Date, 		to: ValueType.String, &generate!(Date,string).convert},
+		{from: ValueType.DateTime, 	to: ValueType.String, &generate!(DateTime,string).convert},
+		// string to other
+		{from: ValueType.String, 	to: ValueType.Char, &generate!(string,char).convert},
+		{from: ValueType.String, 	to: ValueType.Short, &generate!(string,short).convert},
+		{from: ValueType.String, 	to: ValueType.Int, &generate!(string,int).convert},
+		{from: ValueType.String, 	to: ValueType.Long, &generate!(string,long).convert},
+		{from: ValueType.String, 	to: ValueType.Float, &generate!(string,float).convert},
+		{from: ValueType.String, 	to: ValueType.Double, &generate!(string,double).convert},
+		{from: ValueType.String, 	to: ValueType.Raw, &generate!(string,ubyte[]).convert},
+		{from: ValueType.String, 	to: ValueType.Time, &generate!(string,Time).convert},
+		{from: ValueType.String, 	to: ValueType.Date, &generate!(string,Date).convert},
+		{from: ValueType.String, 	to: ValueType.DateTime, &generate!(string,DateTime).convert},
+		// char to other
+		{from: ValueType.Char, 	to: ValueType.Short, &generate!(char,short).convert},
+		{from: ValueType.Char, 	to: ValueType.Int, &generate!(char,int).convert},
+		{from: ValueType.Char, 	to: ValueType.Long, &generate!(char,long).convert},
+		{from: ValueType.Char, 	to: ValueType.Float, &generate!(char,float).convert},
+		{from: ValueType.Char, 	to: ValueType.Double, &generate!(char,double).convert},
+		{from: ValueType.Char, 	to: ValueType.Raw, &generate!(char,ubyte[]).convert},
+		//short to other
+		{from: ValueType.Short, to: ValueType.Char, &generate!(short,char).convert},
+		{from: ValueType.Short, to: ValueType.Int, &generate!(short,int).convert},
+		{from: ValueType.Short, to: ValueType.Long, &generate!(short,long).convert},
+		{from: ValueType.Short, to: ValueType.Float, &generate!(short,float).convert},
+		{from: ValueType.Short, to: ValueType.Double, &generate!(short,double).convert},
+		{from: ValueType.Short, to: ValueType.Raw, &generate!(short,ubyte[]).convert},
+		// int to other
+		{from: ValueType.Int, to: ValueType.Char, &generate!(int,char).convert},
+		{from: ValueType.Int, to: ValueType.Short, &generate!(int,short).convert},
+		{from: ValueType.Int, to: ValueType.Long, &generate!(int,long).convert},
+		{from: ValueType.Int, to: ValueType.Float, &generate!(int,float).convert},
+		{from: ValueType.Int, to: ValueType.Double, &generate!(int,double).convert},
+		{from: ValueType.Int, to: ValueType.Raw, &generate!(int,ubyte[]).convert},
+		// long to Other
+		{from: ValueType.Long, to: ValueType.Char, &generate!(long,char).convert},
+		{from: ValueType.Long, to: ValueType.Short, &generate!(long,short).convert},
+		{from: ValueType.Long, to: ValueType.Int, &generate!(long,int).convert},
+		{from: ValueType.Long, to: ValueType.Float, &generate!(long,float).convert},
+		{from: ValueType.Long, to: ValueType.Double, &generate!(long,double).convert},
+		{from: ValueType.Long, to: ValueType.Raw, &generate!(long,ubyte[]).convert},
+		{from: ValueType.Long, to: ValueType.DateTime, &generate!(int,DateTime).convert},
+		//double to Other
+		{from: ValueType.Double, to: ValueType.Char, &generate!(double,char).convert},
+		{from: ValueType.Double, to: ValueType.Short, &generate!(double,short).convert},
+		{from: ValueType.Double, to: ValueType.Int, &generate!(double,int).convert},
+		{from: ValueType.Double, to: ValueType.Float, &generate!(double,float).convert},
+		{from: ValueType.Double, to: ValueType.Long, &generate!(double,long).convert},
+		{from: ValueType.Double, to: ValueType.Raw, &generate!(double,ubyte[]).convert},
+		//float to Other
+		{from: ValueType.Float, to: ValueType.Char, &generate!(float,char).convert},
+		{from: ValueType.Float, to: ValueType.Short, &generate!(float,short).convert},
+		{from: ValueType.Float, to: ValueType.Int, &generate!(float,int).convert},
+		{from: ValueType.Float, to: ValueType.Double, &generate!(float,double).convert},
+		{from: ValueType.Float, to: ValueType.Long, &generate!(float,long).convert},
+		{from: ValueType.Float, to: ValueType.Raw, &generate!(float,ubyte[]).convert},
+		//raw to other
+		{from: ValueType.Raw, 	to: ValueType.Char, &generate!(ubyte[],char).convert},
+		{from: ValueType.Raw, 	to: ValueType.Short, &generate!(ubyte[],short).convert},
+		{from: ValueType.Raw, 	to: ValueType.Int, &generate!(ubyte[],int).convert},
+		{from: ValueType.Raw, 	to: ValueType.Long, &generate!(ubyte[],long).convert},
+		{from: ValueType.Raw, 	to: ValueType.Float, &generate!(ubyte[],float).convert},
+		{from: ValueType.Raw, 	to: ValueType.Double, &generate!(ubyte[],double).convert},
+		{from: ValueType.Raw, 	to: ValueType.Time, &generate!(ubyte[],Time).convert},
+		{from: ValueType.Raw, 	to: ValueType.Date, &generate!(ubyte[],Date).convert},
+		{from: ValueType.Raw, 	to: ValueType.DateTime, &generate!(ubyte[],DateTime).convert},
+		//date to datetime
+		{from: ValueType.Date, 	to: ValueType.DateTime, &generate!(Date,DateTime).convert},
+		{from: ValueType.Date, 	to: ValueType.Raw, &generate!(Date,ubyte[]).convert},
+		{from: ValueType.Time, 	to: ValueType.Raw, &generate!(Time,ubyte[]).convert},
+		{from: ValueType.Time, 	to: ValueType.DateTime, &generate!(Time,DateTime).convert},
+		// datetime to other
+		{from: ValueType.DateTime, 	to: ValueType.Date, &generate!(DateTime,Date).convert},
+		{from: ValueType.DateTime, 	to: ValueType.Time, &generate!(DateTime,Time).convert},
+		{from: ValueType.DateTime, 	to: ValueType.Long, &generate!(DateTime,long).convert},
+		{from: ValueType.DateTime, 	to: ValueType.Raw, &generate!(DateTime,ubyte[]).convert}
+	];
 
-    struct Elem {
-        ValueType from, to;
-        void function(Result*, void*, void*) convert;
-    }
+	static Elem* lookup(ValueType x, ValueType y) {
+	// rework into efficient array lookup
+		foreach(ref i; converters) {
+			if (i.from == x && i.to == y) return &i;
+		}
+		return null;
+	}
 
-    // only cross converters, todo: all converters
-    static Elem[1] converters = [// {from: ValueType.Int, to: ValueType.String, &generate!(int,string).convert},
-    // {from: ValueType.String, to: ValueType.Int, &generate!(string,int).convert},
-    //{from: ValueType.Date, to: ValueType.String, &generate!(Date,string).convert},
-    // variants
-    {
-    from:
-        ValueType.Int, to : ValueType.Variant, &generate!(int, Variant).convert},//{from: ValueType.String, to: ValueType.Variant, &generate!(string,Variant).convert},
-        //{from: ValueType.Date, to: ValueType.Variant, &generate!(Date,Variant).convert},
-        ];
+	struct generate(X,Y) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			import std.conv;
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			*cast(Y*) y_ = to!Y(v_.get!X());
+		}
+	}
 
-        //  static Elem* lookup(ValueType x, ValueType y) {
-        // rework into efficient array lookup
-        //    foreach(ref i; converters) {
-        //       if (i.from == x && i.to == y) return &i;
-        //  }
-        //     return null;
-        //  }
+	struct generate(X : DateTime,Y : Time) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			DateTime dt = v_.get!X();
+			*cast(Y*) y_ = Time(dt.hour, dt.minute, dt.second);
+		} 
+	}
 
-        struct generate(X, Y) {
-            static void convert(Result* r, void* x_, void* y_) {
-                // import std.conv;
-                Cell* cell = cast(Cell*) x_;
-                // *cast(Y*) y_ = to!Y(r.get!X(cell));
-            }
-        }
+	struct generate(X : DateTime,Y : long) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			DateTime dt = v_.get!X();
+			*cast(Y*) y_ = SysTime(dt).toUnixTime() ;
+		} 
+	}
 
-        //   struct generate(X,Y:Variant) {
-        //      static void convert(Result *r, void *x_, void *y_) {
-        // Cell* cell = cast(Cell*) x_;
-        // *cast(Y*) y_ = r.get!X(cell);
-        //      }
-        //  }
+	struct generate(X : DateTime,Y : Date) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			DateTime dt = v_.get!X();
+			*cast(Y*) y_ = dt.date;
+		} 
+	}
 
-        //   static void conversionError(ValueType x, ValueType y) {
-        //       import std.conv;
-        //       string msg;
-        //       msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
-        //       throw new DatabaseException(msg);
-        //   }
-    }
+	struct generate(X : string,Y : Date) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			Date dt;
+			dt.fromISOExtString(v_.get!X());
+			*cast(Y*) y_  = dt;
+		}
+	}
+
+	struct generate(X : string,Y : Time) {
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			*cast(Y*) y_ = Time.formString(v_.get!X());
+		}
+	}
+
+	struct generate(X,Y : DateTime)
+	{
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			static if(is (X == ubyte[]))
+			{
+				ubyte[] dt = v_.get!X();
+				if(dt.length < Y.sizeof)
+					throw new Exception("Raw Data Length is to smail!");
+				auto data = dt[0..Y.sizeof];
+				auto tm = cast(Y *) data.ptr;
+				*cast(Y*) y_ = *tm;
+			}
+			else static if(is(X == string))
+			{
+				DateTime dt;
+				dt.fromISOExtString(v_.get!X());
+				*cast(Y*) y_  = dt;
+			}
+			else static if (is(X == long))
+			{
+					*cast(Y*) y_  = cast(DateTime)SysTime.fromUnixTime(v_.get!X());
+			}
+			else
+			{
+				string msg = "unsupported conversion from: " ~ X.stringof ~ " to " ~ Y.stringof;
+				throw new DatabaseException(msg);
+			}
+		}
+	}
+
+	struct generate(X : char, Y)
+	{
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			static if(is (Y == ubyte[]))
+			{
+				char a = v_.get!X();
+				ubyte[] dt = new ubyte[1];
+				dt[0] = cast(ubyte)a;
+				*cast(Y*) y_ = dt;
+			}
+			else static if(is(Y == string))
+			{
+				string a;
+				a ~=  v_.get!X();
+				*cast(Y*) y_  = a;
+			}
+			else static if(isNumeric!Y)
+			{
+				*cast(Y*) y_  = v_.get!X();
+			}
+			else
+			{
+				string msg = "unsupported conversion from: " ~ X.stringof ~ " to " ~ Y.stringof;
+				throw new DatabaseException(msg);
+			}
+		}
+	}
+
+	struct generate(X ,  Y : char)
+	{
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			static if(is (X == ubyte[]))
+			{
+				ubyte[] dt = v_.get!X();
+				*cast(Y*) y_ = cast(char)dt[0];
+			}
+			else static if(is(X == string))
+			{
+				string a =  v_.get!X();
+				*cast(Y*) y_  = a[0];
+			}
+			else static if(isNumeric!Y)
+			{
+				*cast(Y*) y_  = cast(char)v_.get!X();
+			}
+			else
+			{
+				string msg = "unsupported conversion from: " ~ X.stringof ~ " to " ~ Y.stringof;
+				throw new DatabaseException(msg);
+			}
+		}
+	}
+
+	struct generate(X : ubyte[], Y) if(!(is(Y == char) || is(Y == DateTime)))
+	{
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			ubyte[] a =  v_.get!X();
+			static if(is(X == string))
+			{
+				*cast(Y*) y_  = cast(string)a;
+			}
+			else 
+			{
+				if(a.length < Y.sizeof)
+					throw new Exception("Raw Data Length is to smail!");
+				auto data = a[0..Y.sizeof];
+				auto tm = cast(Y *) data.ptr;
+				*cast(Y*) y_ = *tm;
+			}
+		}
+	}
+
+	struct generate(X , Y : ubyte[]) if(!is(X == char))
+	{
+		static void convert(Variant * v_,void *x_, void *y_) {
+			Cell* cell = cast(Cell*) x_;// why this must be have?
+			static if(is(X == string))
+			{
+				string a =  v_.get!X();
+				*cast(Y*) y_  = cast(ubyte[])a;
+			}
+			else 
+			{
+				ubyte[] data = new ubyte[X.sizeof];
+				auto dt =  v_.get!X();
+				ubyte * ptr = cast(ubyte *) &dt;
+				data[] = ptr[0..X.sizeof];
+				*cast(Y*) y_ = data;
+			}
+		}
+	}
+
+
+
+	static void conversionError(ValueType x, ValueType y) {
+		import std.conv;
+		string msg;
+		msg ~= "unsupported conversion from: " ~ to!string(x) ~ " to " ~ to!string(y);
+		throw new DatabaseException(msg);
+	}
+} 
