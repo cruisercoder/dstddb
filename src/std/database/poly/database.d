@@ -441,7 +441,7 @@ struct Driver(Policy) {
             }
 
             Variant getValue(Cell* cell) {
-                return Variant; //TODO:
+                return Variant(); //TODO:
             }
 
             bool isNull(Cell* cell) {

@@ -262,8 +262,9 @@ struct Driver(Policy) {
         }
 
         ubyte[] rawData(Cell* cell) {
-			ubyte * bytes = cast(ubyte *)sqlite3_column_blob(rs, idx);
-			int len = sqlite3_column_bytes(rs, idx);
+			int idx = cast(int) cell.bind.idx;
+			ubyte * bytes = cast(ubyte *)sqlite3_column_blob(st_, idx);
+			int len = sqlite3_column_bytes(st_, idx);
 			return bytes[0..len];
         }
 
@@ -283,14 +284,14 @@ struct Driver(Policy) {
                     import core.stdc.string : strlen;
 
                     auto ptr = cast(immutable char*) sqlite3_column_text(st_,idx);
-					int len = sqlite3_column_bytes(rs, idx);
+					int len = sqlite3_column_bytes(st_, idx);
                     value = cast(string) ptr[0 .. len]; // fix with length
 					cell.bind.type = ValueType.String;
                 }
                 break;
             case SQLITE_BLOB: {
-					ubyte * bytes = cast(ubyte *)sqlite3_column_blob(rs, idx);
-					int len = sqlite3_column_bytes(rs, idx);
+					ubyte * bytes = cast(ubyte *)sqlite3_column_blob(st_, idx);
+					int len = sqlite3_column_bytes(st_, idx);
 					value = bytes[0..len];
 					cell.bind.type = ValueType.Raw;
 				}
@@ -298,6 +299,8 @@ struct Driver(Policy) {
             case SQLITE_NULL:
 				cell.bind.type = ValueType.String;
                 break;
+			default:
+				break;
             }
             return value; 
         }

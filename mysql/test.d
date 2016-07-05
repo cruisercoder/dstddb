@@ -4,8 +4,6 @@ import std.database.mysql;
 import std.experimental.logger;
 import std.stdio;
 
-import std.database.rowset;
-
 unittest {
     import std.database.testsuite;
     alias DB = Database!DefaultPolicy;

@@ -790,6 +790,10 @@ struct BasicValue(D, P) {
         return resultPtr.name(cell_.idx_);
     }
 
+	auto chars(){
+		return as!string();
+	}
+
     auto get(T)() {
         if (data_.convertsTo!T())
             return Nullable!T(as!T);
