@@ -86,9 +86,7 @@ enum ValueType {
     Time,
     DateTime,
 
-    Raw,
-
-//    Variant //TODO: remove
+    Raw
 }
 // improve
 struct TypeInfo(T : char)
