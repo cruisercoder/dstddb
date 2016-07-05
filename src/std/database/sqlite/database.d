@@ -296,10 +296,8 @@ struct Driver(Policy) {
 					cell.bind.type = ValueType.Raw;
 				}
                 break;
-            case SQLITE_NULL:
-				cell.bind.type = ValueType.String;
-                break;
 			default:
+				cell.bind.type = ValueType.UNKnown;
 				break;
             }
             return value; 

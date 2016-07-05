@@ -86,7 +86,9 @@ enum ValueType {
     Time,
     DateTime,
 
-    Raw
+    Raw,
+
+	UNKnown
 }
 // improve
 struct TypeInfo(T : char)
@@ -874,7 +876,9 @@ struct Converter(D,P) {
 	alias Value = Cell.Value;
 
 	static Y convert(Y)(ref Cell cell,ref Value value) {
+		if(value.isNull()) throw new DatabaseException("The Value is Null!");
 		ValueType x = cell.bind.type, y = TypeInfo!Y.type;
+		if(x == ValueType.UNKnown) throw new DatabaseException("The Value type is Unknown! please use rawData() get Data.");
 		if (x == y) return value.data_.get!Y(); 
 		auto e = lookup(x,y);
 		if (!e) conversionError(x,y);

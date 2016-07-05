@@ -458,7 +458,9 @@ struct Driver(Policy) {
                     b.type = ValueType.Raw;
                     break;
                 default:
-                    throw new DatabaseException("unsupported type");
+					b.type = ValueType.UNKnown;
+					break;
+                   // throw new DatabaseException("unsupported type");
                 }
             }
         }
