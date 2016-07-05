@@ -333,7 +333,8 @@ struct Driver(Policy) {
         int fmt;
         string name;
     }
-
+	// use std.database.front.ValueType not std.traits.ValueType
+	alias ValueType = std.database.front.ValueType;
     struct Bind {
         ValueType type;
         int idx;
@@ -621,9 +622,9 @@ struct Driver(Policy) {
             case BOOLOID: {
                     immutable char* ptr = cast(immutable char*) dt;
                     auto str = cast(string) ptr[0 .. leng];
-                    if (s == "true" || s == "t" || s == "1")
+					if (str == "true" || str == "t" || str == "1")
                         value = 1;
-                    else if (s == "false" || s == "f" || s == "0")
+					else if (str == "false" || str == "f" || str == "0")
                         value = 0;
                     else {
                         auto t = cast(ubyte*) ptr;
