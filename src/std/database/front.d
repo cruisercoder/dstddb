@@ -786,7 +786,7 @@ struct BasicValue(D, P) {
 
     bool isNull() {
         return resultPtr.isNull(&cell_);
-    } //fix
+    } 
 
     string name() {
         return resultPtr.name(cell_.idx_);
@@ -802,6 +802,10 @@ struct BasicValue(D, P) {
         else
             return Nullable!T;
     }
+
+	auto dbType(){
+		resultPtr.type(cast(int)cell_.idx_);
+	}
 
     // not sure if this does anything
     //const(char)[] chars() {return as!string;}

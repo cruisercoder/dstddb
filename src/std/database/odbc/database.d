@@ -364,6 +364,10 @@ struct Driver(Policy) {
             }
         }
 
+		auto type(int col){
+			return describe[i].type;
+		}
+
         int fetch() {
             //info("SQLFetch");
             status = SQLFetch(stmt.stmt);

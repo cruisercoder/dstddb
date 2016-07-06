@@ -659,7 +659,7 @@ struct Driver(Policy) {
             return PQgetisnull(res, row, col) != 0;
         }
 
-        int type(int col) {
+        auto type(int col) {
             return describe[col].dbType;
         }
 

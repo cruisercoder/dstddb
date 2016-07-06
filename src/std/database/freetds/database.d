@@ -356,6 +356,10 @@ struct Driver(Policy) {
             return value;
         }
 
+		auto type(int col){
+			return describe[i].type;
+		}
+
         bool isNull(Cell* cell) {
             return false;
         }

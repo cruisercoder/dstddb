@@ -268,6 +268,11 @@ struct Driver(Policy) {
 			return bytes[0..len];
         }
 
+		auto type(int col)
+		{
+			return sqlite3_column_type(st_, col);
+		}
+
         Variant getValue(Cell* cell) {
             Variant value;
             int idx = cast(int) cell.bind.idx;

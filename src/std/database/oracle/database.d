@@ -573,6 +573,10 @@ struct Driver(Policy) {
                         return value; //TODO:
                     }
 
+					auto type(int col){
+						return describe[i].oType;
+					}
+
                     bool isNull(Cell* cell) {
                         return false;
                     }

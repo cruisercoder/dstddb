@@ -509,6 +509,10 @@ private struct Driver(Policy) {
                 return value;
             }
 
+			auto type(int col){
+				return describe[col].field.type;
+			}
+
             /*
                char[] get(X:char[])(Bind *b) {
                auto ptr = cast(char*) b.data.ptr;
@@ -966,6 +970,10 @@ private struct Driver(Policy) {
             }
 
             // value getters
+
+			auto type(int col){
+				return describe[col].field.type;
+			}
 
             auto name(size_t idx) {
                 return describe[idx].name;
