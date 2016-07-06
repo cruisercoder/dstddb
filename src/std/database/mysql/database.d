@@ -344,7 +344,7 @@ private struct Driver(Policy) {
                     d.field = mysql_fetch_field(result_metadata);
 
                     auto p = cast(immutable(char)*) d.field.name;
-                    d.name = p[0 .. strlen(p)];
+                    d.name = p[0 .. d.field.name_length];//strlen(p)];
 
                     info("describe: name: ", d.name, ", mysql type: ", d.field.type);
                 }

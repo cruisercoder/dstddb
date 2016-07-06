@@ -436,7 +436,7 @@ struct Driver(Policy) {
                 return 0;
             }
 
-			auto type(int col){return 0;}
+            auto type(int col){return 0;}
 
             ubyte[] rawData(Cell* cell) {
                 return null;
