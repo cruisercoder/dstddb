@@ -763,6 +763,10 @@ struct BasicValue(D, P) {
         auto r = cell_.result_;
         return &(r.result()); // last parens matter here (something about delegate)
     }
+    
+    Cell cell(){
+        return cell_;
+    }
 
     Variant value() {
         return data_;
@@ -777,7 +781,7 @@ struct BasicValue(D, P) {
     }
 
     auto as(T)() {
-		return Converter.convert!T(cell_,this);
+	return Converter.convert!T(cell_,this);
     }
 
     auto as(T : Variant)() {
@@ -792,20 +796,21 @@ struct BasicValue(D, P) {
         return resultPtr.name(cell_.idx_);
     }
 
-	auto chars(){
-		return as!string();
-	}
-
-    auto get(T)() {
-        if (data_.convertsTo!T())
-            return Nullable!T(as!T);
-        else
-            return Nullable!T;
+    auto chars(){
+            return as!string();
     }
 
-	auto dbType(){
-		resultPtr.type(cast(int)cell_.idx_);
-	}
+    auto get(T)() {
+        try{
+            return Nullable!T(as!T);
+        }catch{
+            return Nullable!T;
+        }
+    }
+
+    auto dbType(){
+        resultPtr.type(cast(int)cell_.idx_);
+    }
 
     // not sure if this does anything
     //const(char)[] chars() {return as!string;}
@@ -848,6 +853,10 @@ struct BasicCell(D, P) {
 
     auto rowIdx() {
         return rowIdx_;
+    }
+    
+    auto columnIdx(){
+        return idx_;
     }
 }
 
