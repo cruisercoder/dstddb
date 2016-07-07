@@ -809,7 +809,7 @@ struct BasicValue(D, P) {
     }
 
     auto dbType(){
-        resultPtr.type(cast(int)cell_.idx_);
+        return resultPtr.type(cast(int)cell_.idx_);
     }
 
     // not sure if this does anything
