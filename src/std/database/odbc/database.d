@@ -394,7 +394,7 @@ struct Driver(Policy) {
 
         Variant getValue(Cell* cell) {
             Variant = value;
-            if (cell.bind.type = ValueType.String) {
+            if (cell.bind.type == ValueType.String) {
                 auto ptr = cast(immutable char*) cell.bind.data;
                 value = cast(string) ptr[0 .. cell.bind.len];
             }

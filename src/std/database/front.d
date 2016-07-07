@@ -804,7 +804,7 @@ struct BasicValue(D, P) {
         try{
             return Nullable!T(as!T);
         }catch{
-            return Nullable!T;
+            return Nullable!T();
         }
     }
 
