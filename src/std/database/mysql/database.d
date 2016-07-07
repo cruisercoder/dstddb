@@ -119,7 +119,7 @@ private struct Driver(Policy) {
             }
 
             ~this() {
-                log("~Database");
+              //  log("~Database");
             }
         }
 
@@ -140,7 +140,7 @@ private struct Driver(Policy) {
             }
 
             ~this() {
-                log("~Statement");
+               // log("~Statement");
                 if (mysql)
                     mysql_close(mysql);
                 mysql = null;
@@ -185,7 +185,7 @@ private struct Driver(Policy) {
             }
 
             ~this() {
-                log("~Statement");
+               // log("~Statement");
                 foreach (b; inputBind)
                     allocator.deallocate(b.data);
                 if (stmt)
@@ -321,12 +321,12 @@ private struct Driver(Policy) {
             }
 
             ~this() {
-                log("~Result");
+               // log("~Result");
                 foreach (b; bind)
                     allocator.deallocate(b.data);
                 if (result_metadata)
                     mysql_free_result(result_metadata);
-                log("~Result");
+             //   log("~Result");
             }
 
             void build_describe() {
@@ -612,7 +612,7 @@ private struct Driver(Policy) {
             }
 
             ~this() {
-                log("~Statement");
+               // log("~Statement");
                 if (mysql)
                     mysql_close(mysql);
                 mysql = null;

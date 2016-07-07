@@ -69,7 +69,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            info("~Database");
+          //  info("~Database");
             //dbexit(); // should this be called (only on process exit?)
         }
 

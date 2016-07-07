@@ -72,7 +72,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            writeln("sqlite closing ", path);
+         //   writeln("sqlite closing ", path);
             if (sq) {
                 int rc = sqlite3_close(sq);
                 sq = null;

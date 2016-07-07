@@ -58,7 +58,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            info("~Database");
+           // info("~Database");
             if (!env)
                 return;
             check("SQLFreeHandle", SQL_HANDLE_ENV, env, SQLFreeHandle(SQL_HANDLE_ENV,
@@ -117,7 +117,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            info("~Connection: ", source);
+           // info("~Connection: ", source);
             if (connected)
                 check("SQLDisconnect()", SQL_HANDLE_DBC, con, SQLDisconnect(con));
             check("SQLFreeHandle", SQLFreeHandle(SQL_HANDLE_DBC, con));
@@ -142,7 +142,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            info("~Statement");
+          //  info("~Statement");
             for (int i = 0; i < inputbind_.length; ++i) {
                 allocator.deallocate(inputbind_[i].data[0 .. inputbind_[i].allocSize]);
             }

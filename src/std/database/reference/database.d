@@ -61,7 +61,7 @@ struct Database(T) {
         }
 
         ~this() {
-            info("closing database resource");
+        //    info("closing database resource");
         }
 
         this(this) {

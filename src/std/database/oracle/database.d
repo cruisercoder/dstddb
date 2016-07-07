@@ -179,7 +179,7 @@ struct Driver(Policy) {
                     }
 
                     ~this() {
-                        info("oracle: closing database");
+                     //   info("oracle: closing database");
                         if (env) {
                             sword status = OCIHandleFree(env, OCI_HTYPE_ENV);
                             env = null;
