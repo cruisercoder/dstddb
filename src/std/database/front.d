@@ -41,33 +41,33 @@ struct Time {
     uint second;
     uint msecond;
 
-	string toString(){
-		import std.string;
-		import std.format;
-		return format("%d:%d:%d.%d",hour,minute,second,msecond);
-	}
+    string toString(){
+            import std.string;
+            import std.format;
+            return format("%d:%d:%d.%d",hour,minute,second,msecond);
+    }
 
-	static Time formString(string str){
-		import std.string;
-		import std.array;
-		import std.conv;
-		int idx = cast(int)str.indexOf(".");
-		string dt;
-		uint msec = 0;
-		if(idx > 0)
-		{
-			dt = str[0..idx];
-			msec = to!uint(str[idx..$]);
-		}
-		else
-		{
-			dt = str;
-		}
-		string[] tm = dt.split(":");
-		if(tm.length != 3)
-			throw new Exception("erro string To Time : ", str);
-		return Time(to!uint(tm[0]),to!uint(tm[1]),to!uint(tm[2]),msec);
-	}
+    static Time formString(string str){
+            import std.string;
+            import std.array;
+            import std.conv;
+            int idx = cast(int)str.indexOf(".");
+            string dt;
+            uint msec = 0;
+            if(idx > 0)
+            {
+                    dt = str[0..idx];
+                    msec = to!uint(str[idx..$]);
+            }
+            else
+            {
+                    dt = str;
+            }
+            string[] tm = dt.split(":");
+            if(tm.length != 3)
+                    throw new Exception("erro string To Time : ", str);
+            return Time(to!uint(tm[0]),to!uint(tm[1]),to!uint(tm[2]),msec);
+    }
 }
 
 enum ValueType {
@@ -88,7 +88,7 @@ enum ValueType {
 
     Raw,
 
-	UNKnown
+    UNKnown
 }
 // improve
 struct TypeInfo(T : char)
@@ -786,7 +786,7 @@ struct BasicValue(D, P) {
 
     auto as(T : Variant)() {
         return data_;
-    } //Converter.convert!T(resultPtr, cell_);}
+    } 
 
     bool isNull() {
         return resultPtr.isNull(&cell_);
@@ -804,7 +804,7 @@ struct BasicValue(D, P) {
         try{
             return Nullable!T(as!T);
         }catch{
-            return Nullable!T();
+            return Nullable!T.init;
         }
     }
 
