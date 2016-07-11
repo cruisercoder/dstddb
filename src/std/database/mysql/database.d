@@ -73,8 +73,11 @@ private static void raiseError()(string msg, int ret) {
 
 private static void raiseError()(string msg, MYSQL_STMT* stmt, int ret) {
     import core.stdc.string : strlen;
-
+    import std.string;
+    
     const(char*) err = mysql_stmt_error(stmt);
+    msg ~= "  erro: ";
+    msg ~= fromStringz(err);
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
