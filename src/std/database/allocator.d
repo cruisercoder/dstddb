@@ -18,7 +18,7 @@ struct MyMallocator {
     @system // removed @nogc and nothrow for logging
     bool deallocate(void[] b) {
         import core.stdc.stdlib : free;
-        log("deallocate: ptr: ", b.ptr, "   size: ", b.length);
+        //log("deallocate: ptr: ", b.ptr, "   size: ", b.length);
         free(b.ptr);
 	//log("return true");
         return true;

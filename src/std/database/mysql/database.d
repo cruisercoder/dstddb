@@ -389,18 +389,19 @@ private struct Driver(Policy) {
 
                     case MYSQL_TYPE_DATE:
                         b.type = ValueType.Date;
+                        b.allocSize += 32;
                         break;
                     case MYSQL_TYPE_TIME:
                     case MYSQL_TYPE_TIME2:
                         b.type = ValueType.Time;
-                        b.allocSize += 30;
+                        b.allocSize += 32;
                         break;
                     case MYSQL_TYPE_DATETIME2:
                     case MYSQL_TYPE_DATETIME:
                     case MYSQL_TYPE_TIMESTAMP2:
                     case MYSQL_TYPE_TIMESTAMP:
                         b.type = ValueType.DateTime;
-                        b.allocSize += 30;
+                        b.allocSize += 32;
                         break;
                     case MYSQL_TYPE_BLOB:
                         b.type = ValueType.Raw;
@@ -413,7 +414,7 @@ private struct Driver(Policy) {
                         break;
 
                     }
-                   // trace("d.field.length : ", d.field.length, "  type is : ", b.type);
+                    trace("d.field.length : ", d.field.length, "  type is : ", b.type);
                     // let in ints for now
                     /*    if (d.field.type == MYSQL_TYPE_LONG) {
                         b.mysql_type = d.field.type;
@@ -856,6 +857,7 @@ private struct Driver(Policy) {
 
                     case MYSQL_TYPE_DATE:
                         b.type = ValueType.Date;
+                        b.allocSize += 32;
                         break;
                     case MYSQL_TYPE_TIME:
                     case MYSQL_TYPE_TIME2:
@@ -880,17 +882,6 @@ private struct Driver(Policy) {
                         break;
 
                     }
-                    // let in ints for now
-                    /*    if (d.field.type == MYSQL_TYPE_LONG) {
-                        b.mysql_type = d.field.type;
-                        b.type = ValueType.Int;
-                    } else if (d.field.type == MYSQL_TYPE_DATE) {
-                        b.mysql_type = d.field.type;
-                        b.type = ValueType.Date;
-                    } else {
-                        b.mysql_type = MYSQL_TYPE_STRING;
-                        b.type = ValueType.String;
-                    }*/
                     b.data = allocator.allocate(b.allocSize);
                 }
 
