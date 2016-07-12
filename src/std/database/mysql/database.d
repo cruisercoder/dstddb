@@ -308,7 +308,7 @@ private struct Driver(Policy) {
             MYSQL_RES* result_metadata;
             int status;
 
-            static const maxData = 256;
+            static const maxData = 2048;
 
             this(Statement* stmt_, int rowArraySize_) {
                 stmt = stmt_;
@@ -359,12 +359,14 @@ private struct Driver(Policy) {
 
                 bind.reserve(columns);
 
+                
                 for (int i = 0; i != columns; ++i) {
                     auto d = &describe[i];
                     bind ~= Bind();
                     auto b = &bind.back();
                     b.mysql_type = d.field.type;
                     b.allocSize = cast(uint)(d.field.length + 1);
+                    
                     switch (d.field.type) {
                     case MYSQL_TYPE_TINY:
                         b.type = ValueType.Char;
@@ -400,6 +402,10 @@ private struct Driver(Policy) {
                         b.type = ValueType.DateTime;
                         b.allocSize += 30;
                         break;
+                    case MYSQL_TYPE_BLOB:
+                        b.type = ValueType.Raw;
+                        b.allocSize += 512;
+                        break;
                     default:
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
@@ -407,6 +413,7 @@ private struct Driver(Policy) {
                         break;
 
                     }
+                   // trace("d.field.length : ", d.field.length, "  type is : ", b.type);
                     // let in ints for now
                     /*    if (d.field.type == MYSQL_TYPE_LONG) {
                         b.mysql_type = d.field.type;
@@ -454,36 +461,23 @@ private struct Driver(Policy) {
                 if (isNull(cell))
                     return value;
                 switch (cell.bind.type) {
-                case ValueType.Char: {
-                        auto t = (*cast(char*) cell.bind.data.ptr);
-                        value = t;
-                    }
+                case ValueType.Char:
+                    value = (*cast(char*) cell.bind.data.ptr);
                     break;
-                case ValueType.Short: {
-                        auto t = (*cast(short*) cell.bind.data.ptr);
-                        value = t;
-
-                    }
+                case ValueType.Short:
+                    value = (*cast(short*) cell.bind.data.ptr);
                     break;
-                case ValueType.Int: {
-                        auto t = (*cast(int*) cell.bind.data.ptr);
-                        value = t;
-                    }
+                case ValueType.Int:
+                    value = (*cast(int*) cell.bind.data.ptr);
                     break;
-                case ValueType.Long: {
-                        auto t = (*cast(long*) cell.bind.data.ptr);
-                        value = t;
-                    }
+                case ValueType.Long:
+                    value = (*cast(long*) cell.bind.data.ptr);
                     break;
-                case ValueType.Float: {
-                        auto t = (*cast(float*) cell.bind.data.ptr);
-                        value = t;
-                    }
+                case ValueType.Float:
+                    value = (*cast(float*) cell.bind.data.ptr);
                     break;
-                case ValueType.Double: {
-                        auto t = (*cast(double*) cell.bind.data.ptr);
-                        value = t;
-                    }
+                case ValueType.Double:
+                    value = (*cast(double*) cell.bind.data.ptr);
                     break;
                 case ValueType.String: {
                         auto ptr = cast(char*) cell.bind.data.ptr;
@@ -506,15 +500,20 @@ private struct Driver(Policy) {
                             t.second);
                     }
                     break;
+                case ValueType.Raw:{
+                        auto ptr = cast(ubyte * ) cell.bind.data.ptr;
+                        value = ptr[0 .. cell.bind.length];
+                    }
+                    break;
                 default:
                     break;
                 }
                 return value;
             }
 
-			auto type(int col){
-				return describe[col].field.type;
-			}
+            auto type(int col){
+                    return describe[col].field.type;
+            }
 
             /*
                char[] get(X:char[])(Bind *b) {
@@ -870,10 +869,10 @@ private struct Driver(Policy) {
                         b.type = ValueType.DateTime;
                         b.allocSize += 30;
                         break;
-					case MYSQL_TYPE_BLOB:
-						b.type = ValueType.Raw;
-						b.allocSize += 512;
-						break;
+                    case MYSQL_TYPE_BLOB:
+                        b.type = ValueType.Raw;
+                        b.allocSize += 512;
+                        break;
                     default:
                         b.mysql_type = MYSQL_TYPE_STRING;
                         b.type = ValueType.String;
@@ -961,11 +960,11 @@ private struct Driver(Policy) {
                             t.second);
                     }
                     break;
-				case ValueType.Raw:{
-						auto ptr = cast(ubyte * ) cell.bind.data.ptr;
-						value = ptr[0 .. cell.bind.length];
-					}
-					break;
+                case ValueType.Raw:{
+                                auto ptr = cast(ubyte * ) cell.bind.data.ptr;
+                                value = ptr[0 .. cell.bind.length];
+                        }
+                        break;
                 default:
                     break;
                 }

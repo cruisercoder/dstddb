@@ -10,7 +10,7 @@ struct MyMallocator {
         import core.stdc.stdlib : malloc;
         if (!bytes) return null;
         auto p = malloc(bytes);
-		//log("allocate: ptr: ", p , "  size :",bytes);
+	//log("allocate: ptr: ", p , "  size :",bytes);
         return p ? p[0 .. bytes] : null;
     }
 
@@ -18,9 +18,9 @@ struct MyMallocator {
     @system // removed @nogc and nothrow for logging
     bool deallocate(void[] b) {
         import core.stdc.stdlib : free;
-        //log("deallocate: ptr: ", b.ptr, "   size: ", b.length);
+        log("deallocate: ptr: ", b.ptr, "   size: ", b.length);
         free(b.ptr);
-		//log("return true");
+	//log("return true");
         return true;
     }
 
