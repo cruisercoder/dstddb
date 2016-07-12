@@ -118,6 +118,7 @@ extern(System) {
     struct PGresult {};
 
     int PQsendQuery(PGconn *conn, const char *command);
+    
     PGresult *PQgetResult(PGconn *conn);
 
     int	PQsetSingleRowMode(PGconn *conn);
@@ -125,6 +126,8 @@ extern(System) {
     ExecStatusType PQresultStatus(const PGresult *res);
     char *PQresStatus(ExecStatusType status);
 
+    PGresult * PQexec(PGconn *conn, const char *command);
+    
     PGresult *PQexecParams(
             PGconn *conn,
             const char *command,

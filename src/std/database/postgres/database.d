@@ -139,10 +139,10 @@ struct Driver(Policy) {
         PGresult* prepareRes;
         PGresult* res;
 
-        Array!(char*) bindValue;
+     /*   Array!(char*) bindValue;
         Array!(Oid) bindType;
         Array!(int) bindLength;
-        Array!(int) bindFormat;
+        Array!(int) bindFormat;*/
 
         this(Connection* connection_, string sql_) {
             connection = connection_;
@@ -153,11 +153,11 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            for (int i = 0; i != bindValue.length; ++i) {
+/*            for (int i = 0; i != bindValue.length; ++i) {
                 auto ptr = bindValue[i];
                 auto length = bindLength[i];
                 allocator.deallocate(ptr[0 .. length]);
-            }
+            }*/
         }
 
         void bind(int n, int value) {
@@ -171,20 +171,11 @@ struct Driver(Policy) {
 
             info("query sql: ", sql);
 
-            if (!prepareRes)
-                prepare();
-            auto n = bindValue.length;
-            int resultFormat = 1;
-
             static if (Policy.nonblocking) {
 
                 checkForZero(con, "PQsetnonblocking", PQsetnonblocking(con, 1));
 
-                check(con, "PQsendQueryPrepared", PQsendQueryPrepared(con,
-                    toStringz(name), cast(int) n,
-                    n ? cast(const char**)&bindValue[0] : null,
-                    n ? cast(int*)&bindLength[0] : null,
-                    n ? cast(int*)&bindFormat[0] : null, resultFormat));
+                check(con, "PQsendQueryPrepared", PQsendQuery(con,toStringz(sql)));
 
                 do {
                     Policy.Handler handler;
@@ -214,20 +205,8 @@ struct Driver(Policy) {
 
             }
             else {
-                res = PQexecPrepared(con, toStringz(name), cast(int) n,
-                    n ? cast(const char**)&bindValue[0] : null,
-                    n ? cast(int*)&bindLength[0] : null,
-                    n ? cast(int*)&bindFormat[0] : null, resultFormat);
+                res = PQexec(con,toStringz(sql));
             }
-
-            /*
-               not using for now
-               if (!PQsendQuery(con, toStringz(sql))) throw error("PQsendQuery");
-               res = PQgetResult(con);
-             */
-
-            // problem with PQsetSingleRowMode and prepared statements
-            // if (!PQsetSingleRowMode(con)) throw error("PQsetSingleRowMode");
         }
 
         void query(X...)(X args) {
@@ -235,14 +214,14 @@ struct Driver(Policy) {
 
             // todo: stack allocation
 
-            bindValue.clear();
+    /*        bindValue.clear();
             bindType.clear();
             bindLength.clear();
             bindFormat.clear();
 
             foreach (ref arg; args)
                 bind(arg);
-
+    
             auto n = bindValue.length;
 
             /*
@@ -257,19 +236,27 @@ struct Driver(Policy) {
                0);
              */
 
-            int resultForamt = 0;
+       /*     int resultForamt = 0;
 
             res = PQexecParams(con, toStringz(sql), cast(int) n,
                 n ? cast(Oid*)&bindType[0] : null,
                 n ? cast(const char**)&bindValue[0] : null,
                 n ? cast(int*)&bindLength[0] : null,
                 n ? cast(int*)&bindFormat[0] : null, resultForamt);
+        */
         }
 
         bool hasRows() {
-            return true;
+            return rowCout() > 0;
         }
-
+        
+        int rowCout()
+        {
+            int r = 0;
+            if(res !is null) r = PQntuples(res);
+            return r;
+        }
+/*
         int binds() {
             return cast(int) bindValue.length;
         } // fix
@@ -300,7 +287,7 @@ struct Driver(Policy) {
 
         void bind(Date v) {
             /* utility functions take 8 byte values but DATEOID is a 4 byte value */
-            import std.bitmanip;
+       /*     import std.bitmanip;
 
             int[3] mdy;
             mdy[0] = v.month;
@@ -315,7 +302,7 @@ struct Driver(Policy) {
             bindLength ~= cast(int) s.length;
             bindFormat ~= 1;
         }
-
+*/
         void prepare() {
             const Oid* paramTypes;
             prepareRes = PQprepare(con, toStringz(name), toStringz(sql), 0, paramTypes);
@@ -366,6 +353,7 @@ struct Driver(Policy) {
         int row;
         int rows;
         bool hasResult_;
+        bool fristFecth = true;
 
         // artifical bind array (for now)
         Array!Bind bind;
@@ -479,7 +467,16 @@ struct Driver(Policy) {
         }
 
         int fetch() {
-            return ++row != rows ? 1 : 0;
+            int r = 0;
+            if(fristFecth)
+                r = rows > 0 ? 1 : 0;
+            else 
+            {
+                ++row;
+                r = row != rows ? 1 : 0;
+            }
+            fristFecth = false;
+            return r;
         }
 
         bool singleRownext() {
@@ -549,7 +546,7 @@ struct Driver(Policy) {
         }
 
         Variant getValue(Cell* cell) {
-            import std.bitmanip;
+            import std.conv;
 
             Variant value;
             if (isNull(cell))
@@ -557,101 +554,75 @@ struct Driver(Policy) {
 
             void* dt = data(cell.bind.idx);
             int leng = len(cell.bind.idx);
+            immutable char* ptr = cast(immutable char*) dt;
+            string str = cast(string) ptr[0 .. leng];
             switch (type(cell.bind.idx)) {
-            case VARCHAROID: {
-                    immutable char* ptr = cast(immutable char*) dt;
-                    value = cast(string) ptr[0 .. leng];
+            case VARCHAROID: 
+            case TEXTOID:
+            case NAMEOID:{
+                    value = str;
                 }
                 break;
             case INT2OID: {
-                    auto t = cast(ubyte*) dt;
-                    ubyte[short.sizeof] data;
-                    data[] = t[0 .. short.sizeof];
-                    value = bigEndianToNative!short(data);
+                    value = parse!short(str);
                 }
                 break;
             case INT4OID: {
-                    auto t = cast(ubyte*) dt;
-                    ubyte[int.sizeof] data;
-                    data[] = t[0 .. int.sizeof];
-                    value = bigEndianToNative!int(data);
+                    value = parse!int(str);
                 }
                 break;
             case INT8OID: {
-                    auto t = cast(ubyte*) dt;
-                    ubyte[long.sizeof] data;
-                    data[] = t[0 .. long.sizeof];
-                    value = bigEndianToNative!long(data);
+                   value = parse!long(str);
                 }
                 break;
             case FLOAT4OID: {
-                    auto t = cast(ubyte*) dt;
-                    ubyte[float.sizeof] data;
-                    data[] = t[0 .. float.sizeof];
-                    value = bigEndianToNative!float(data);
+                   value = parse!float(str);
                 }
                 break;
             case FLOAT8OID: {
-                    auto t = cast(ubyte*) dt;
-                    ubyte[double.sizeof] data;
-                    data[] = t[0 .. double.sizeof];
-                    value = bigEndianToNative!double(data);
+                    value = parse!double(str);
                 }
                 break;
             case DATEOID: {
-                    import std.bitmanip;
-
-                    auto ptr = cast(ubyte*) data(cell.bind.idx);
-                    int sz = len(cell.bind.idx);
-                    date d = bigEndianToNative!uint(ptr[0 .. 4]); // why not sz?
-                    int[3] mdy;
-                    PGTYPESdate_julmdy(d, &mdy[0]);
-                    value = Date(mdy[2], mdy[0], mdy[1]);
+                    import std.format: formattedRead;
+                    string input = str;
+                    int year, month, day;
+                    formattedRead(input, "%s-%s-%s", &year, &month, &day);
+                    value =  Date(year, month, day);
                 }
                 break;
             case TIMESTAMPOID: {
                     import std.string;
-
-                    immutable char* ptr = cast(immutable char*) dt;
-                    auto str = cast(string) ptr[0 .. leng];
+                    
                     value = DateTime.fromISOExtString(str.translate([' ' : 'T']).split('.').front());
                 }
                 break;
             case TIMEOID: {
-                    immutable char* ptr = cast(immutable char*) dt;
-                    auto str = cast(string) ptr[0 .. leng];
                     value = parseTimeoid(str);
                 }
                 break;
             case BYTEAOID: {
-                    immutable char* ptr = cast(immutable char*) dt;
-                    auto str = cast(string) ptr[0 .. leng];
                     value = byteaToUbytes(str);
                 }
                 break;
             case CHAROID: {
-                    auto t = cast(char*) dt;
-                    value = cast(char)(leng > 0 ? t[0] : 0x00);
+                    value = cast(char)(leng > 0 ? str[0] : 0x00);
                 }
                 break;
             case BOOLOID: {
-                    immutable char* ptr = cast(immutable char*) dt;
-                    auto str = cast(string) ptr[0 .. leng];
-					if (str == "true" || str == "t" || str == "1")
-                        value = 1;
-					else if (str == "false" || str == "f" || str == "0")
-                        value = 0;
-                    else {
-                        auto t = cast(ubyte*) ptr;
-                        ubyte[int.sizeof] data;
-                        data[] = t[0 .. int.sizeof];
-                        value = bigEndianToNative!int(data);
-                    }
+
+                    if (str == "true" || str == "t" || str == "1")
+                            value = 1;
+                    else if (str == "false" || str == "f" || str == "0")
+                            value = 0;
+                    else 
+                        value = parse!int(str);
                 }
                 break;
             default:
                 break;
             }
+            trace("value is : ",value );
             return value;
         }
 
