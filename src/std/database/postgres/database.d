@@ -17,6 +17,7 @@ import std.database.front;
 import std.stdio;
 import std.typecons;
 import std.datetime;
+import std.conv;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
@@ -43,14 +44,14 @@ void error()(PGconn* con, string msg) {
     import std.conv;
 
     auto s = msg ~ to!string(PQerrorMessage(con));
-    throw new DatabaseException(msg);
+    throw new DatabaseException(s);
 }
 
 void error()(PGconn* con, string msg, int result) {
     import std.conv;
 
     auto s = "error:" ~ msg ~ ": " ~ to!string(result) ~ ": " ~ to!string(PQerrorMessage(con));
-    throw new DatabaseException(msg);
+    throw new DatabaseException(s);
 }
 
 int check()(PGconn* con, string msg, int result) {
@@ -98,7 +99,19 @@ struct Driver(Policy) {
             source = source_;
 
             string conninfo;
-            conninfo ~= "dbname=" ~ source.database;
+            if(source.host.length > 0)
+            {
+                conninfo ~= "host=" ~ source.host;
+                if(source.port > 0) conninfo ~= " port=" ~ to!string(source.port);
+            }
+            else
+            {
+                conninfo ~= "host=" ~ source.server;
+            }
+            conninfo ~= " dbname=" ~ source.database;
+            if(source.username.length > 0) conninfo ~= " user=" ~ source.username;
+            if(source.password.length > 0) conninfo ~= " password=" ~ source.password;
+            trace("link string is : ", conninfo);
             con = PQconnectdb(toStringz(conninfo));
             if (PQstatus(con) != CONNECTION_OK)
                 error(con, "login error");
