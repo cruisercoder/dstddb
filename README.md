@@ -20,6 +20,13 @@ Available in [DUB](https://code.dlang.org/packages/dstddb), the D package regist
 - Array input/output binding support
 - Connection pooling
 
+### Related Work
+[CPPSTDDB](https://github.com/cruisercoder/cppstddb) is a related project with
+similar objectives tailored to the constraints of the C++ language.  The aim is
+for both projects to complement each other by proving the validity of specific
+design choices that apply to both and to draw on implementation correctness 
+re-enforced from dual language development.
+
 ## Examples
 
 #### simple query
