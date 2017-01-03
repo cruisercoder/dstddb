@@ -24,28 +24,26 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Driver!T,T);
+alias Database(T) = BasicDatabase!(Driver!T, T);
 
-auto createDatabase()(string defaultURI="") {
-    return Database!DefaultPolicy(defaultURI);  
+auto createDatabase()(string defaultURI = "") {
+    return Database!DefaultPolicy(defaultURI);
 }
 
-auto createDatabase(T)(string defaultURI="") {
-    return Database!T(defaultURI);  
+auto createDatabase(T)(string defaultURI = "") {
+    return Database!T(defaultURI);
 }
 
 struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Cell = BasicCell!(Driver, Policy);
 
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        static const FeatureArray features = [
-            Feature.InputBinding,
-            //Feature.DateBinding,
-            //Feature.ConnectionPool,
-            ];
+        static const FeatureArray features = [Feature.InputBinding,//Feature.DateBinding,
+        //Feature.ConnectionPool,
+        ];
 
         this(string defaultSource_) {
         }
@@ -74,7 +72,7 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            writeln("sqlite closing ", path);
+         //   writeln("sqlite closing ", path);
             if (sq) {
                 int rc = sqlite3_close(sq);
                 sq = null;
@@ -93,7 +91,7 @@ struct Driver(Policy) {
         string sql;
         State state;
         sqlite3* sq;
-        sqlite3_stmt *st;
+        sqlite3_stmt* st;
         bool hasRows;
         int binds_;
 
@@ -112,28 +110,23 @@ struct Driver(Policy) {
             }
         }
 
-        void bind(int col, int value){
-            int rc = sqlite3_bind_int(
-                    st, 
-                    col,
-                    value);
+        void bind(int col, int value) {
+            int rc = sqlite3_bind_int(st, col, value);
             if (rc != SQLITE_OK) {
                 throw_error("sqlite3_bind_int");
             }
         }
 
-        void bind(int col, const char[] value){
-            if(value is null) {
+        void bind(int col, const char[] value) {
+            if (value is null) {
                 int rc = sqlite3_bind_null(st, col);
-                if (rc != SQLITE_OK) throw_error("bind1");
-            } else {
+                if (rc != SQLITE_OK)
+                    throw_error("bind1");
+            }
+            else {
                 //cast(void*)-1);
-                int rc = sqlite3_bind_text(
-                        st, 
-                        col,
-                        value.ptr,
-                        cast(int) value.length,
-                        null);
+                int rc = sqlite3_bind_text(st, col, value.ptr, cast(int) value.length,
+                    null);
                 if (rc != SQLITE_OK) {
                     writeln(rc);
                     throw_error("bind2");
@@ -145,49 +138,53 @@ struct Driver(Policy) {
             throw new DatabaseException("Date input binding not yet implemented");
         }
 
-        int binds() {return binds_;}
+        int binds() {
+            return binds_;
+        }
 
         void prepare() {
-            if (!st) { 
-                int res = sqlite3_prepare_v2(
-                        sq, 
-                        toStringz(sql), 
-                        cast(int) sql.length + 1, 
-                        &st, 
-                        null);
-                if (res != SQLITE_OK) throw_error(sq, "prepare", res);
+            if (!st) {
+                int res = sqlite3_prepare_v2(sq, toStringz(sql),
+                    cast(int) sql.length + 1, &st, null);
+                if (res != SQLITE_OK)
+                    throw_error(sq, "prepare", res);
                 binds_ = sqlite3_bind_parameter_count(st);
             }
         }
 
         void query() {
             //if (state == State.Execute) throw new DatabaseException("already executed"); // restore
-            if (state == State.Execute) return;
+            if (state == State.Execute)
+                return;
             state = State.Execute;
             int status = sqlite3_step(st);
             info("sqlite3_step: status: ", status);
             if (status == SQLITE_ROW) {
                 hasRows = true;
-            } else if (status == SQLITE_DONE) {
+            }
+            else if (status == SQLITE_DONE) {
                 reset();
-            } else {
+            }
+            else {
                 throw_error(sq, "step error", status);
             }
         }
 
-        void query(X...) (X args) {
+        void query(X...)(X args) {
             bindAll(args);
             query();
         }
 
-        private void bindAll(T...) (T args) {
+        private void bindAll(T...)(T args) {
             int col;
-            foreach (arg; args) bind(++col, arg);
+            foreach (arg; args)
+                bind(++col, arg);
         }
 
         void reset() {
             int status = sqlite3_reset(st);
-            if (status != SQLITE_OK) throw new DatabaseException("sqlite3_reset error");
+            if (status != SQLITE_OK)
+                throw new DatabaseException("sqlite3_reset error");
         }
 
     }
@@ -199,7 +196,7 @@ struct Driver(Policy) {
 
     struct Result {
         private Statement* stmt_;
-        private sqlite3_stmt *st_;
+        private sqlite3_stmt* st_;
         int columns;
         int status_;
 
@@ -213,21 +210,42 @@ struct Driver(Policy) {
 
             // artificial bind setup
             bind.reserve(columns);
-            for(int i = 0; i < columns; ++i) {
+            for (int i = 0; i < columns; ++i) {
                 bind ~= Bind();
                 auto b = &bind.back();
-                b.type = ValueType.String;
+			/*	switch (sqlite3_column_type(st_, i))
+				{
+					case SQLITE_INTEGER:
+						b.type = ValueType.Int;
+						break;
+					case SQLITE_FLOAT:
+						b.type = ValueType.Float;
+						break;
+					case SQLITE3_TEXT: {
+						b.type = ValueType.String;
+						break;
+					case SQLITE_BLOB:
+						b.type = ValueType.Raw;
+						break;
+					default:
+						b.type = ValueType.String;
+						break;
+				}*/
+				b.type = ValueType.String;
                 b.idx = i;
             }
         }
 
         //~this() {}
 
-        bool hasRows() {return stmt_.hasRows;}
+        bool hasRows() {
+            return stmt_.hasRows;
+        }
 
         int fetch() {
             status_ = sqlite3_step(st_);
-            if (status_ == SQLITE_ROW) return 1;
+            if (status_ == SQLITE_ROW)
+                return 1;
             if (status_ == SQLITE_DONE) {
                 stmt_.reset();
                 return 0;
@@ -237,30 +255,68 @@ struct Driver(Policy) {
         }
 
         auto name(size_t idx) {
-            import core.stdc.string: strlen;
+            import core.stdc.string : strlen;
+
             auto ptr = sqlite3_column_name(st_, cast(int) idx);
-            return cast(string) ptr[0..strlen(ptr)];
+            return cast(string) ptr[0 .. strlen(ptr)];
         }
 
-        auto get(X:string)(Cell* cell) {
-            import core.stdc.string: strlen;
-            auto ptr = cast(immutable char*) sqlite3_column_text(st_, cast(int) cell.bind.idx);
-            return cast(string) ptr[0..strlen(ptr)]; // fix with length
+        ubyte[] rawData(Cell* cell) {
+			int idx = cast(int) cell.bind.idx;
+			ubyte * bytes = cast(ubyte *)sqlite3_column_blob(st_, idx);
+			int len = sqlite3_column_bytes(st_, idx);
+			return bytes[0..len];
         }
 
-        auto get(X:int)(Cell* cell) {
-            return sqlite3_column_int(st_, cast(int) cell.bind.idx);
+		auto type(int col)
+		{
+			return sqlite3_column_type(st_, col);
+		}
+
+        Variant getValue(Cell* cell) {
+            Variant value;
+            int idx = cast(int) cell.bind.idx;
+            switch (sqlite3_column_type(st_, idx)) {
+            case SQLITE_INTEGER:
+				value = sqlite3_column_int64(st_, idx);
+				cell.bind.type = ValueType.Long;
+                break;
+            case SQLITE_FLOAT:
+                value = sqlite3_column_double(st_, idx);
+				cell.bind.type = ValueType.Double;
+                break;
+            case SQLITE3_TEXT: {
+                    import core.stdc.string : strlen;
+
+                    auto ptr = cast(immutable char*) sqlite3_column_text(st_,idx);
+					int len = sqlite3_column_bytes(st_, idx);
+                    value = cast(string) ptr[0 .. len]; // fix with length
+					cell.bind.type = ValueType.String;
+                }
+                break;
+            case SQLITE_BLOB: {
+					ubyte * bytes = cast(ubyte *)sqlite3_column_blob(st_, idx);
+					int len = sqlite3_column_bytes(st_, idx);
+					value = bytes[0..len];
+					cell.bind.type = ValueType.Raw;
+				}
+                break;
+			default:
+				cell.bind.type = ValueType.UNKnown;
+				break;
+            }
+            return value; 
         }
 
-        auto get(X:Date)(Cell* cell) {
-            return Date(2016,1,1); // fix
+        bool isNull(Cell* cell) {
+            return sqlite3_column_type(st_, cast(int) cell.bind.idx) == SQLITE_NULL;
         }
-
     }
 
-    private static void throw_error()(sqlite3 *sq, string msg, int ret) {
+    private static void throw_error()(sqlite3* sq, string msg, int ret) {
         import std.conv;
-        import core.stdc.string: strlen;
+        import core.stdc.string : strlen;
+
         const(char*) err = sqlite3_errmsg(sq);
         throw new DatabaseException("sqlite error: " ~ msg ~ ": " ~ to!string(err)); // need to send err
     }
@@ -269,13 +325,15 @@ struct Driver(Policy) {
         throw new DatabaseException(label);
     }
 
-    private static void throw_error()(string label, char *msg) {
+    private static void throw_error()(string label, char* msg) {
         // frees up pass char * as required by sqlite
         import core.stdc.string : strlen;
+
         char[] m;
         sizediff_t sz = strlen(msg);
         m.length = sz;
-        for(int i = 0; i != sz; i++) m[i] = msg[i];
+        for (int i = 0; i != sz; i++)
+            m[i] = msg[i];
         sqlite3_free(msg);
         throw new DatabaseException(label ~ m.idup);
     }
@@ -303,8 +361,8 @@ return sqlite3_column_text(result_.st_, cast(int) idx_);
 
      */
 
-extern(C) int sqlite_callback(void* cb, int howmany, char** text, char** columns) {
-    return 0;
-}
+    extern (C) int sqlite_callback(void* cb, int howmany, char** text, char** columns) {
+        return 0;
+    }
 
 }

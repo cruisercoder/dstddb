@@ -16,50 +16,47 @@ import std.experimental.logger;
 public import std.database.allocator;
 import std.database.front;
 import std.datetime;
+import std.variant;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Driver!T,T);
+alias Database(T) = BasicDatabase!(Driver!T, T);
 
-auto createDatabase()(string defaultURI="") {
-    return Database!DefaultPolicy(defaultURI);  
+auto createDatabase()(string defaultURI = "") {
+    return Database!DefaultPolicy(defaultURI);
 }
-
 
 struct Driver(Policy) {
     alias Allocator = Policy.Allocator;
-    alias Cell = BasicCell!(Driver!Policy,Policy);
+    alias Cell = BasicCell!(Driver!Policy, Policy);
 
     private static bool isError(RETCODE ret) {
-        return 
-            ret != SUCCEED &&
-            ret != REG_ROW &&
-            ret != NO_MORE_ROWS &&
-            ret != NO_MORE_RESULTS;
+        return ret != SUCCEED && ret != REG_ROW && ret != NO_MORE_ROWS && ret != NO_MORE_RESULTS;
     }
 
     static T* check(T)(string msg, T* object) {
         info(msg);
-        if (object == null) throw new DatabaseException("error: " ~ msg);
+        if (object == null)
+            throw new DatabaseException("error: " ~ msg);
         return object;
     }
 
     static RETCODE check(string msg, RETCODE ret) {
         info(msg, " : ", ret);
-        if (isError(ret)) throw new DatabaseException("error: " ~ msg);
+        if (isError(ret))
+            throw new DatabaseException("error: " ~ msg);
         return ret;
     }
 
     struct Database {
         alias queryVariableType = QueryVariableType.QuestionMark;
 
-        static const FeatureArray features = [
-            //Feature.InputBinding,
-            //Feature.DateBinding,
-            //Feature.ConnectionPool,
-            ];
+        static const FeatureArray features = [//Feature.InputBinding,
+        //Feature.DateBinding,
+        //Feature.ConnectionPool,
+        ];
 
         Allocator allocator;
 
@@ -72,43 +69,30 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            info("~Database");
+          //  info("~Database");
             //dbexit(); // should this be called (only on process exit?)
         }
 
+        static extern (C) int errorHandler(DBPROCESS* dbproc, int severity,
+            int dberr, int oserr, char* dberrstr, char* oserrstr) {
 
-        static extern(C) int errorHandler(
-                DBPROCESS* dbproc,
-                int severity,
-                int dberr,
-                int oserr,
-                char *dberrstr,
-                char *oserrstr) {
-
-            auto con = cast(Connection *) dbgetuserdata(dbproc);
+            auto con = cast(Connection*) dbgetuserdata(dbproc);
             if (con) {
                 con.error.message = to!string(dberrstr);
             }
-            info("error: ",
-                    "severity: ", severity,
-                    ", db error: ", to!string(dberrstr),
-                    ", os error: ", to!string(oserrstr));
+            info("error: ", "severity: ", severity, ", db error: ",
+                to!string(dberrstr), ", os error: ", to!string(oserrstr));
 
             return INT_CANCEL;
         }
 
-        static extern(C) int msgHandler(
-                DBPROCESS *dbproc,
-                DBINT msgno,
-                int msgstate,
-                int severity,
-                char *msgtext,
-                char *srvname,
-                char *procname,
-                int line) {
+        static extern (C) int msgHandler(DBPROCESS* dbproc, DBINT msgno,
+            int msgstate, int severity, char* msgtext, char* srvname, char* procname,
+            int line) {
 
-            auto con = cast(Connection *) dbgetuserdata(dbproc);
-            if (con) {}
+            auto con = cast(Connection*) dbgetuserdata(dbproc);
+            if (con) {
+            }
             info("msg: ", to!string(msgtext), ", severity:", severity);
             return 0;
         }
@@ -118,8 +102,8 @@ struct Driver(Policy) {
     struct Connection {
         Database* db;
         Source source;
-        LOGINREC *login;
-        DBPROCESS *con;
+        LOGINREC* login;
+        DBPROCESS* con;
 
         DatabaseError error;
 
@@ -140,22 +124,26 @@ struct Driver(Policy) {
             string server;
             if (source.host.length != 0) {
                 server = source.host ~ ":" ~ to!string(source.port);
-            } else {
+            }
+            else {
                 server = source.server;
             }
 
             //con = dbopen(login, toStringz(source.server));
-            con = check("tdsdbopen: " ~ server, tdsdbopen(login, toStringz(server), 1));
+            con = check("tdsdbopen: " ~ server, tdsdbopen(login, toStringz(server),
+                1));
 
-            dbsetuserdata(con, cast(BYTE*) &this);
+            dbsetuserdata(con, cast(BYTE*)&this);
 
             check("dbuse", dbuse(con, toStringz(source.database)));
         }
 
         ~this() {
             //info("~Connection: ", source);
-            if (con) dbclose(con);
-            if (login) dbloginfree(login);
+            if (con)
+                dbclose(con);
+            if (login)
+                dbloginfree(login);
         }
 
     }
@@ -163,7 +151,7 @@ struct Driver(Policy) {
     struct Statement {
         Connection* con;
         string sql;
-        Allocator *allocator;
+        Allocator* allocator;
         int binds;
         //Array!Bind inputbind_;
 
@@ -186,35 +174,41 @@ struct Driver(Policy) {
             RETCODE status = check("dbsqlexec: ", dbsqlexec(con.con));
         }
 
-        void query(X...) (X args) {
+        void query(X...)(X args) {
             bindAll(args);
             query();
         }
 
         //bool hasRows() {return status != NO_MORE_RESULTS;}
-        bool hasRows() {return true;}
+        bool hasRows() {
+            return true;
+        }
 
-        private void bindAll(T...) (T args) {
+        private void bindAll(T...)(T args) {
             //int col;
             //foreach (arg; args) bind(++col, arg);
         }
 
-        void bind(int n, int value) {}
-        void bind(int n, const char[] value) {}
+        void bind(int n, int value) {
+        }
+
+        void bind(int n, const char[] value) {
+        }
 
         void reset() {
         }
 
         private RETCODE check(string msg, RETCODE ret) {
             info(msg, " : ", ret);
-            if (isError(ret)) throw new DatabaseException(con.error, msg);
+            if (isError(ret))
+                throw new DatabaseException(con.error, msg);
             return ret;
         }
     }
 
     struct Describe {
-        char *name;
-        char *buffer;
+        char* name;
+        char* buffer;
         int type;
         int size;
         int status;
@@ -232,14 +226,19 @@ struct Driver(Policy) {
         //int columns() {return columns;}
 
         Statement* stmt;
-        Allocator *allocator;
+        Allocator* allocator;
         int columns;
         Array!Describe describe;
         Array!Bind bind;
         RETCODE status;
 
-        private auto con() {return stmt.con;}
-        private auto dbproc() {return con.con;}
+        private auto con() {
+            return stmt.con;
+        }
+
+        private auto dbproc() {
+            return con.con;
+        }
 
         this(Statement* stmt_, int rowArraySize_) {
             stmt = stmt_;
@@ -251,15 +250,16 @@ struct Driver(Policy) {
         }
 
         ~this() {
-            foreach(b; bind) allocator.deallocate(b.data);
+            foreach (b; bind)
+                allocator.deallocate(b.data);
         }
 
         void build_describe() {
 
             describe.reserve(columns);
 
-            for(int i = 0; i < columns; ++i) {
-                int c = i+1;
+            for (int i = 0; i < columns; ++i) {
+                int c = i + 1;
                 describe ~= Describe();
                 auto d = &describe.back();
 
@@ -276,59 +276,53 @@ struct Driver(Policy) {
 
             bind.reserve(columns);
 
-            for(int i = 0; i < columns; ++i) {
-                int c = i+1;
+            for (int i = 0; i < columns; ++i) {
+                int c = i + 1;
                 bind ~= Bind();
                 auto b = &bind.back();
                 auto d = &describe[i];
 
                 int allocSize;
                 switch (d.type) {
-                    case SYBCHAR:
-                        b.type = ValueType.String;
-                        b.size = 255;
-                        allocSize = b.size+1;
-                        b.bindType = NTBSTRINGBIND;
-                        break;
-                    case SYBMSDATE:
-                        b.type = ValueType.Date;
-                        b.size = DBDATETIME.sizeof;
-                        allocSize = b.size;
-                        b.bindType = DATETIMEBIND;
-                        break;
-                    default: 
-                        b.type = ValueType.String;
-                        b.size = 255;
-                        allocSize = b.size+1;
-                        b.bindType = NTBSTRINGBIND;
-                        break;
+                case SYBCHAR:
+                    b.type = ValueType.String;
+                    b.size = 255;
+                    allocSize = b.size + 1;
+                    b.bindType = NTBSTRINGBIND;
+                    break;
+                case SYBMSDATE:
+                    b.type = ValueType.Date;
+                    b.size = DBDATETIME.sizeof;
+                    allocSize = b.size;
+                    b.bindType = DATETIMEBIND;
+                    break;
+                default:
+                    b.type = ValueType.String;
+                    b.size = 255;
+                    allocSize = b.size + 1;
+                    b.bindType = NTBSTRINGBIND;
+                    break;
                 }
 
                 b.data = allocator.allocate(allocSize); // make consistent acros dbs
                 GC.addRange(b.data.ptr, b.data.length);
 
-                check("dbbind", dbbind(
-                            dbproc,
-                            c,
-                            b.bindType,
-                            cast(DBINT) b.data.length,
-                            cast(BYTE*) b.data.ptr));
+                check("dbbind", dbbind(dbproc, c, b.bindType,
+                    cast(DBINT) b.data.length, cast(BYTE*) b.data.ptr));
 
                 check("dbnullbind", dbnullbind(dbproc, c, &b.status));
 
-                info(
-                        "output bind: index: ", i,
-                        ", type: ", b.bindType,
-                        ", size: ", b.size,
-                        ", allocSize: ", b.data.length);
+                info("output bind: index: ", i, ", type: ", b.bindType,
+                    ", size: ", b.size, ", allocSize: ", b.data.length);
             }
         }
 
         int fetch() {
             status = check("dbnextrow", dbnextrow(dbproc));
             if (status == REG_ROW) {
-                return 1; 
-            } else if (status == NO_MORE_ROWS) {
+                return 1;
+            }
+            else if (status == NO_MORE_ROWS) {
                 stmt.reset();
                 return 0;
             }
@@ -339,32 +333,42 @@ struct Driver(Policy) {
             return to!string(describe[idx].name);
         }
 
-        auto get(X:string)(Cell* cell) {
-            import core.stdc.string: strlen;
-            checkType(cell.bind.bindType, NTBSTRINGBIND);
-            auto ptr = cast(immutable char*) cell.bind.data.ptr;
-            return cast(string) ptr[0..strlen(ptr)];
+        ubyte[] rawData(Cell* cell) { //TODO: fix
+            return null;
         }
 
-        auto get(X:int)(Cell* cell) {
-            //if (b.bindType == SQL_C_CHAR) return to!int(as!string()); // tmp hack
-            //checkType(b.bindType, SQL_C_LONG);
-            //return *(cast(int*) b.data);
-            return 0;
+        Variant getValue(Cell* cell) {
+            Variant value;
+            if (cell.bind.type == ValueType.Date) {
+                auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
+                DBDATEREC d;
+                check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
+                value = Date(d.year, d.month, d.day);
+
+            }
+            else {
+                import core.stdc.string : strlen;
+
+                checkType(cell.bind.bindType, NTBSTRINGBIND);
+                auto ptr = cast(immutable char*) cell.bind.data.ptr;
+                value = cast(string) ptr[0 .. strlen(ptr)];
+            }
+            return value;
         }
 
-        auto get(X:Date)(Cell* cell) {
-            auto ptr = cast(DBDATETIME*) cell.bind.data.ptr;
-            DBDATEREC d;
-            check("dbdatecrack", dbdatecrack(dbproc, &d, ptr));
-            return Date(d.year, d.month, d.day);
+		auto type(int col){
+			return describe[i].type;
+		}
+
+        bool isNull(Cell* cell) {
+            return false;
         }
 
         void checkType(int a, int b) {
-            if (a != b) throw new DatabaseException("type mismatch");
+            if (a != b)
+                throw new DatabaseException("type mismatch");
         }
 
     }
 
 }
-

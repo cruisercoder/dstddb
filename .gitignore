@@ -11,4 +11,11 @@ dub.selections.json
 #unit test binaries
 tests/*/tests
 __test__*__
-
+*.user
+*.userprefs
+.directory
+.project
+*.txt
+*.cmake
+*.kdev4
+.kdev4
