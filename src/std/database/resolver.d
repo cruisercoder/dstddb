@@ -1,5 +1,7 @@
 module std.database.resolver;
 
+import std.experimental.logger;
+
 import std.database.exception;
 import std.database.uri;
 import std.database.source;
@@ -38,6 +40,16 @@ Source resolve(string name) {
     auto home = environment["HOME"];
 
     string file = home ~ "/db.json";
+
+    if (!exists(file)) {
+        info("hacky for automation");
+        source.server = "testdb";
+        source.database = "";
+        source.username = "";
+        source.password = "";
+        return source;
+    }
+
     auto bytes = read(file);
     auto str = to!string(bytes);
     auto doc = parseJSON(str);
