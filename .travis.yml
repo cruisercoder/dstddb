@@ -6,4 +6,4 @@ addons:
     packages:
       - sqlite3
       - libsqlite3-dev
-script: ./travis-cs.sh
+script: ./travis-ci.sh
