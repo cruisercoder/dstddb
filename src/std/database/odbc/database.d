@@ -16,7 +16,7 @@ import std.typecons;
 import std.container.array;
 import std.experimental.logger;
 public import std.database.allocator;
-import std.database.front;
+import std.database.BasicDatabase;
 import std.datetime;
 
 //alias long SQLLEN;

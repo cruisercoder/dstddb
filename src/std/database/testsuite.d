@@ -5,7 +5,7 @@ import std.stdio;
 import std.experimental.logger;
 import std.datetime;
 
-import std.database.front: Feature;
+import std.database.BasicDatabase: Feature;
 
 void testAll(Database) (string source) {
 

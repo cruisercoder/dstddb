@@ -20,7 +20,7 @@ version(Windows) {
 import std.database.mysql.bindings;
 import std.database.exception;
 import std.database.allocator;
-import std.database.front;
+import std.database.BasicDatabase;
 import std.container.array;
 import std.experimental.logger;
 import std.string;

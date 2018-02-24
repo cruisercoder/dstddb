@@ -1,4 +1,4 @@
-module std.database.front;
+module std.database.BasicDatabase;
 import std.experimental.logger;
 import std.database.exception;
 import std.datetime;
@@ -17,18 +17,32 @@ import std.variant;
 import std.range.primitives;
 import std.database.option;
 
+/**
+  BasicDatabase:  a common and generic front-end for database access
+
+  Typically, this interface is impliclity used when import a specific database
+  driver as shown in this simple example:
+
+  ---
+  import std.database.sqlite;
+  auto db = createDatabase("file:///testdb");
+  auto rows = db.connection.query("select name,score from score").rows;
+  foreach (r; rows) {
+    writeln(r[0].as!string,",",r[1].as!int);
+  }
+  ---
+
+  For advanced usage, you can also explicitly instantiate a BasicDatabase
+  with a driver:
+  ---
+  import std.database;
+  alias DB = BasicDatabase!(MyDriver!MyPolicy, MyPolicy);
+  ---
+
+*/
+
+
 public import std.database.array;
-
-/*
-   require a specific minimum version of DMD (2.071)
-   can't use yet because DMD is reporting wrong version
-
-   import std.compiler;
-   static assert(
-   name != "Digital Mars D" ||
-   (version_major == 2 && version_minor == 70));
- */
-
 
 enum ValueType {
     Int,
@@ -53,6 +67,10 @@ enum Feature {
 
 alias FeatureArray = Feature[];
 
+/**
+  A root type for interacting with databases. It's primary purpose is act as
+  a factory for database connections. This type can be shared across threads.
+*/
 struct BasicDatabase(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -125,6 +143,9 @@ auto ref driverDatabase() {return data_.database;}
     }
 }
 
+/**
+  Holds a connection to the database.
+*/
 struct BasicConnection(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -205,6 +226,9 @@ data_ = Data(&db.data_.refCountedPayload(),uri);
 
 }
 
+/**
+  Manages statement details such as query execution and input binding.
+*/
 struct BasicStatement(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -314,6 +338,10 @@ struct BasicStatement(D,P) {
 }
 
 
+/**
+  An internal class for result access and iteration. See the RowSet type for range based access
+  to results
+*/
 struct BasicResult(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -371,6 +399,9 @@ package:
     }
 }
 
+/**
+  A range over result column information
+*/
 struct BasicColumnSet(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -415,6 +446,9 @@ struct BasicColumn(D,P) {
 }
 
 
+/**
+  A input range over the results of a query.
+*/
 struct BasicRowSet(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -485,6 +519,9 @@ struct BasicRowSet(D,P) {
     void popFront() {result_.next();}
 }
 
+/**
+  A row accessor for the current row in a RowSet input range.
+*/
 struct BasicRow(D,P) {
     alias Driver = D;
     alias Policy = P;
@@ -524,6 +561,9 @@ struct BasicRow(D,P) {
 }
 
 
+/**
+  A value accessor for an indexed value in the current row in a RowSet input range.
+*/
 struct BasicValue(D,P) {
     alias Driver = D;
     alias Policy = P;

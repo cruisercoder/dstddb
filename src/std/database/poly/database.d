@@ -10,7 +10,7 @@ public import std.database.exception;
 import std.stdio;
 import std.typecons;
 import std.container.array;
-import std.database.front;
+import std.database.BasicDatabase;
 import std.database.allocator;
 import std.database.source;
 import std.database.common;

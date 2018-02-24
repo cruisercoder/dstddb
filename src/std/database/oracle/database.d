@@ -16,7 +16,7 @@ import std.container.array;
 
 import std.datetime;
 
-import std.database.front;
+import std.database.BasicDatabase;
 
 struct DefaultPolicy {
     alias Allocator = MyMallocator;

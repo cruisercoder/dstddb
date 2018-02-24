@@ -1,5 +1,5 @@
 module std.database.rowset;
-import std.database.front;
+import std.database.BasicDatabase;
 import std.datetime;
 import std.container.array;
 

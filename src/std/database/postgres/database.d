@@ -12,7 +12,7 @@ import std.database.source;
 import std.database.allocator;
 import std.container.array;
 import std.experimental.logger;
-import std.database.front;
+import std.database.BasicDatabase;
 
 import std.stdio;
 import std.typecons;
