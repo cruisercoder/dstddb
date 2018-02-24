@@ -27,9 +27,9 @@ import std.string;
 
 // alias Database(T) = std.database.impl.Database!(T,DatabaseImpl!T); 
 
-alias Database(T) = BasicDatabase!(Driver!T.Sync,T);
+alias Database(T) = BasicDatabase!(Driver!T.Sync);
 
-alias AsyncDatabase(T) = BasicDatabase!(Driver!T.Async,T);
+alias AsyncDatabase(T) = BasicDatabase!(Driver!T.Async);
 
 
 struct DefaultPolicy {
@@ -77,7 +77,8 @@ private static void raiseError()(string msg, MYSQL_STMT* stmt, int ret) {
     throw new DatabaseException("mysql error: " ~ msg);
 }
 
-private struct Driver(Policy) {
+private struct Driver(P) {
+    alias Policy = P;
 
     struct Describe {
         int index;
@@ -98,7 +99,7 @@ private struct Driver(Policy) {
 
     struct Sync {
         alias Allocator = Policy.Allocator;
-        alias Cell = BasicCell!(Sync,Policy);
+        alias Cell = BasicCell!(Sync);
         alias const(ubyte)* cstring;
 
         alias Describe = Driver!Policy.Describe;
@@ -436,7 +437,7 @@ private struct Driver(Policy) {
         alias Allocator = Policy.Allocator;
         alias Describe = Driver!Policy.Describe;
         alias Bind = Driver!Policy.Bind;
-        alias Cell = BasicCell!(Async,Policy);
+        alias Cell = BasicCell!(Async);
 
         struct Database {
             alias queryVariableType = QueryVariableType.QuestionMark;

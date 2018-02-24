@@ -21,16 +21,17 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Driver!T,T);
+alias Database(T) = BasicDatabase!(Driver);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
 }
 
 
-struct Driver(Policy) {
+struct Driver(P) {
+    alias Policy = P;
     alias Allocator = Policy.Allocator;
-    alias Cell = BasicCell!(Driver!Policy,Policy);
+    alias Cell = BasicCell!(Driver);
 
     private static bool isError(RETCODE ret) {
         return 

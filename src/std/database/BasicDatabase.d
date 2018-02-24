@@ -1,22 +1,3 @@
-module std.database.BasicDatabase;
-import std.experimental.logger;
-import std.database.exception;
-import std.datetime;
-
-import std.typecons;
-import std.database.common;
-import std.database.pool;
-import std.database.resolver;
-import std.database.source;
-
-import std.database.allocator;
-import std.traits;
-import std.container.array;
-import std.variant;
-
-import std.range.primitives;
-import std.database.option;
-
 /**
   BasicDatabase:  a common and generic front-end for database access
 
@@ -36,11 +17,28 @@ import std.database.option;
   with a driver:
   ---
   import std.database;
-  alias DB = BasicDatabase!(MyDriver!MyPolicy, MyPolicy);
+  alias DB = BasicDatabase!(MyDriver);
   ---
 
 */
+module std.database.BasicDatabase;
+import std.experimental.logger;
+import std.database.exception;
+import std.datetime;
 
+import std.typecons;
+import std.database.common;
+import std.database.pool;
+import std.database.resolver;
+import std.database.source;
+
+import std.database.allocator;
+import std.traits;
+import std.container.array;
+import std.variant;
+
+import std.range.primitives;
+import std.database.option;
 
 public import std.database.array;
 
@@ -71,13 +69,13 @@ alias FeatureArray = Feature[];
   A root type for interacting with databases. It's primary purpose is act as
   a factory for database connections. This type can be shared across threads.
 */
-struct BasicDatabase(D,P) {
+struct BasicDatabase(D) {
     alias Driver = D;
-    alias Policy = P;
+    alias Policy = Driver.Policy;
     alias Database = Driver.Database;
     alias Allocator = Policy.Allocator;
-    alias Connection = BasicConnection!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Connection = BasicConnection!(Driver);
+    alias Cell = BasicCell!(Driver);
     alias Pool = .Pool!(Driver.Connection);
     alias ScopedResource = .ScopedResource!Pool;
 
@@ -146,12 +144,12 @@ auto ref driverDatabase() {return data_.database;}
 /**
   Holds a connection to the database.
 */
-struct BasicConnection(D,P) {
+struct BasicConnection(D) {
     alias Driver = D;
-    alias Policy = P;
+    alias Policy = Driver.Policy;
     alias DriverConnection = Driver.Connection;
-    alias Statement = BasicStatement!(Driver,Policy);
-    alias Database = BasicDatabase!(Driver,Policy);
+    alias Statement = BasicStatement!(Driver);
+    alias Database = BasicDatabase!(Driver);
     alias Pool = Database.Pool;
     alias ScopedResource = Database.ScopedResource;
     alias DatabaseImpl = Driver.Database;
@@ -229,14 +227,14 @@ data_ = Data(&db.data_.refCountedPayload(),uri);
 /**
   Manages statement details such as query execution and input binding.
 */
-struct BasicStatement(D,P) {
+struct BasicStatement(D) {
     alias Driver = D;
-    alias Policy = P;
+    alias Policy = Driver.Policy;
     alias DriverStatement = Driver.Statement;
-    alias Connection = BasicConnection!(Driver,Policy);
-    alias Result = BasicResult!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
-    alias ColumnSet = BasicColumnSet!(Driver,Policy);
+    alias Connection = BasicConnection!(Driver);
+    alias Result = BasicResult!(Driver);
+    alias RowSet = BasicRowSet!(Driver);
+    alias ColumnSet = BasicColumnSet!(Driver);
     //alias Allocator = Policy.Allocator;
     alias ScopedResource = Connection.ScopedResource;
 
@@ -342,12 +340,12 @@ struct BasicStatement(D,P) {
   An internal class for result access and iteration. See the RowSet type for range based access
   to results
 */
-struct BasicResult(D,P) {
+struct BasicResult(D) {
     alias Driver = D;
-    alias Policy = P;
+    alias Policy = Driver.Policy;
     alias ResultImpl = Driver.Result;
-    alias Statement = BasicStatement!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
+    alias Statement = BasicStatement!(Driver);
+    alias RowSet = BasicRowSet!(Driver);
     //alias Allocator = Driver.Policy.Allocator;
     alias Bind = Driver.Bind;
     //alias Row = .Row;
@@ -402,11 +400,11 @@ package:
 /**
   A range over result column information
 */
-struct BasicColumnSet(D,P) {
+struct BasicColumnSet(D) {
     alias Driver = D;
-    alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Column = BasicColumn!(Driver,Policy);
+    alias Policy = Driver.Policy;
+    alias Result = BasicResult!(Driver);
+    alias Column = BasicColumn!(Driver);
     private Result result_;
 
     this(Result result) {
@@ -428,10 +426,10 @@ struct BasicColumnSet(D,P) {
 }
 
 
-struct BasicColumn(D,P) {
+struct BasicColumn(D) {
     alias Driver = D;
-    alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
+    alias Policy = Driver.Policy;
+    alias Result = BasicResult!(Driver);
     private Result result_;
     private size_t idx_;
 
@@ -449,12 +447,12 @@ struct BasicColumn(D,P) {
 /**
   A input range over the results of a query.
 */
-struct BasicRowSet(D,P) {
+struct BasicRowSet(D) {
     alias Driver = D;
-    alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Row = BasicRow!(Driver,Policy);
-    alias ColumnSet = BasicColumnSet!(Driver,Policy);
+    alias Policy = Driver.Policy;
+    alias Result = BasicResult!(Driver);
+    alias Row = BasicRow!(Driver);
+    alias ColumnSet = BasicColumnSet!(Driver);
 
     void rowSetTag();
 
@@ -522,14 +520,14 @@ struct BasicRowSet(D,P) {
 /**
   A row accessor for the current row in a RowSet input range.
 */
-struct BasicRow(D,P) {
+struct BasicRow(D) {
     alias Driver = D;
-    alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
-    alias RowSet = BasicRowSet!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
-    alias Value = BasicValue!(Driver,Policy);
-    alias Column = BasicColumn!(Driver,Policy);
+    alias Policy = Driver.Policy;
+    alias Result = BasicResult!(Driver);
+    alias RowSet = BasicRowSet!(Driver);
+    alias Cell = BasicCell!(Driver);
+    alias Value = BasicValue!(Driver);
+    alias Column = BasicColumn!(Driver);
 
     private RowSet rows_;
 
@@ -564,12 +562,12 @@ struct BasicRow(D,P) {
 /**
   A value accessor for an indexed value in the current row in a RowSet input range.
 */
-struct BasicValue(D,P) {
+struct BasicValue(D) {
     alias Driver = D;
-    alias Policy = P;
+    alias Policy = Driver.Policy;
     //alias Result = Driver.Result;
-    alias Result = BasicResult!(Driver,Policy);
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Result = BasicResult!(Driver);
+    alias Cell = BasicCell!(Driver);
     alias Bind = Driver.Bind;
     private Result* result_;
     private Bind* bind_;
@@ -632,10 +630,10 @@ struct EfficientValue(T) {
 }
 
 
-struct BasicCell(D,P) {
+struct BasicCell(D) {
     alias Driver = D;
-    alias Policy = P;
-    alias Result = BasicResult!(Driver,Policy);
+    alias Policy = Driver.Policy;
+    alias Result = BasicResult!(Driver);
     alias Bind = Driver.Bind;
     private Bind* bind_;
     private int rowIdx_;
@@ -656,7 +654,7 @@ struct Converter(D,P) {
     alias Policy = P;
     alias Result = Driver.Result;
     alias Bind = Driver.Bind;
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Cell = BasicCell!(Driver);
 
     static Y convert(Y)(Result *r, ref Cell cell) {
         ValueType x = cell.bind.type, y = TypeInfo!Y.type;

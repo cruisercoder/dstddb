@@ -22,7 +22,7 @@ struct DefaultPolicy {
     alias Allocator = MyMallocator;
 }
 
-alias Database(T) = BasicDatabase!(Driver!T,T);
+alias Database(T) = BasicDatabase!(Driver!T);
 
 auto createDatabase()(string defaultURI="") {
     return Database!DefaultPolicy(defaultURI);  
@@ -68,9 +68,10 @@ void attrGet(T)(void* handle, ub4 handleType, OCIError* error, ub4 attribute, re
 
 
 
-struct Driver(Policy) {
+struct Driver(P) {
+    alias Policy = P;
     alias Allocator = Policy.Allocator;
-    alias Cell = BasicCell!(Driver,Policy);
+    alias Cell = BasicCell!(Driver);
 
 
 
