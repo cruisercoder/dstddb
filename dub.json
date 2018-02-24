@@ -1,9 +1,0 @@
-{
-    "name": "dstddb",
-    "description": "A D standard database proposal and implementation",
-    "copyright": "Copyright © 2015, Erik Smith",
-    "authors": ["Erik Smith"],
-    "license": "MIT",
-    "sourcePaths": ["src"]
-}
-

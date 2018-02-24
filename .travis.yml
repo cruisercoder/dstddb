@@ -1,3 +1,9 @@
 language: d
 d:
   - dmd
+addons:
+  apt:
+    packages:
+      - sqlite3
+      - libsqlite3-dev
+script: ./travis-cs.sh
