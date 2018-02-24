@@ -5,6 +5,8 @@ Status: early stage project - unstable and minimally tested
 
 Available in [DUB](https://code.dlang.org/packages/dstddb), the D package registry
 
+[![Build Status](https://travis-ci.org/cruisercoder/dstddb.svg?branch=master)](https://travis-ci.org/cruisercoder/dstddb)
+
 ### Roadmap Highlights
 - A database and driver neutral interface specification
 - Reference counted value objects provide ease of use
