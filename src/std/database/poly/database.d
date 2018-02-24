@@ -230,7 +230,7 @@ struct Driver(Policy) {
 
             info(
                     "poly register: ",
-                    "name: ", name, ", "
+                    "name: ", name, ", ",
                     "type: ", typeid(DB),
                     "index: ", drivers.length);
         }
