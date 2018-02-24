@@ -17,10 +17,9 @@ unittest {
     con.query("drop table t");
 
     auto stmt = statement(con, "select * from t");
-    auto res = stmt.query();
+    auto rows = stmt.query().rows;
 
-    auto range = res[];
-
-    writeResult(range);
+    //auto range = res[];
+    //writeRows(range);
 }
 

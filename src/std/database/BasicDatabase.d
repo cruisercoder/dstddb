@@ -8,16 +8,28 @@
   import std.database.sqlite;
   auto db = createDatabase("file:///testdb");
   auto rows = db.connection.query("select name,score from score").rows;
-  foreach (r; rows) {
-    writeln(r[0].as!string,",",r[1].as!int);
-  }
+  foreach (r; rows) writeln(r[0], r[1]);
   ---
 
-  For advanced usage, you can also explicitly instantiate a BasicDatabase
-  with a driver:
+  BasicDatabase, and it's chain of types, provides a common,  easy to use,
+  and flexibe front end for client interactions with a database. it carefully
+  manages lifetimes and states, making the front end easy to use and the driver layer
+  easy to implement.
+
+  For advanced usage (such as library implementers), you can also explicitly
+  instantiate a BasicDatabase with a specific Driver type:
   ---
+  struct MyDriver {
+    struct Database {//...}
+    struct Connection {//...}
+    struct Statement {//...}
+    struct Bind {//...}
+    struct Result {//...}
+  }
+
   import std.database;
   alias DB = BasicDatabase!(MyDriver);
+  auto db = DB("mysql://127.0.0.1");
   ---
 
 */
@@ -84,20 +96,41 @@ struct BasicDatabase(D) {
     static auto create() {return BasicDatabase(null);}
     static auto create(string url) {return BasicDatabase(url);}
 
+    /**
+      return connection for default database
+    */
     auto connection() {return Connection(this);}
+
+    /**
+      return connection for database specified by URI
+    */
     auto connection(string uri) {return Connection(this, uri);}
 
+    /**
+      return statement 
+    */
     auto statement(string sql) {return connection().statement(sql);}
+
+    /**
+      return statement with specified input binds
+    */
     auto statement(X...) (string sql, X args) {return connection.statement(sql,args);}
 
+    /**
+      return executed statement
+    */
     auto query(string sql) {return connection().query(sql);}
+
+    /**
+      return executed statement object with specified input binds
+    */
     auto query(T...) (string sql, T args) {return statement(sql).query(args);}
 
     //static bool hasFeature(Feature feature);
     // go with non-static hasFeature for now to accomidate poly driver
 
     bool hasFeature(Feature feature) {return hasFeature(data_.database, feature);}
-auto ref driverDatabase() {return data_.database;}
+    auto ref driverDatabase() {return data_.database;}
 
     private struct Payload {
         string defaultURI;
@@ -142,7 +175,7 @@ auto ref driverDatabase() {return data_.database;}
 }
 
 /**
-  Holds a connection to the database.
+  Database connection class
 */
 struct BasicConnection(D) {
     alias Driver = D;

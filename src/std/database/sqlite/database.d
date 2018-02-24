@@ -201,6 +201,7 @@ struct Driver(P) {
     struct Result {
         private Statement* stmt_;
         private sqlite3_stmt *st_;
+        bool init_;
         int columns;
         int status_;
 
@@ -227,6 +228,11 @@ struct Driver(P) {
         bool hasRows() {return stmt_.hasRows;}
 
         int fetch() {
+            // needs more attention
+            if (!init_) {  
+              init_ = 1;
+              return 1;
+            }
             status_ = sqlite3_step(st_);
             if (status_ == SQLITE_ROW) return 1;
             if (status_ == SQLITE_DONE) {

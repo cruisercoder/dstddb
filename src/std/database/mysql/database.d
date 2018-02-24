@@ -98,6 +98,7 @@ private struct Driver(P) {
 
 
     struct Sync {
+        alias Policy = P;
         alias Allocator = Policy.Allocator;
         alias Cell = BasicCell!(Sync);
         alias const(ubyte)* cstring;
@@ -434,6 +435,7 @@ private struct Driver(P) {
     }
 
     struct Async {
+        alias Policy = P;
         alias Allocator = Policy.Allocator;
         alias Describe = Driver!Policy.Describe;
         alias Bind = Driver!Policy.Bind;

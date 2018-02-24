@@ -7,6 +7,39 @@ Available in [DUB](https://code.dlang.org/packages/dstddb), the D package regist
 
 [![Build Status](https://travis-ci.org/cruisercoder/dstddb.svg?branch=master)](https://travis-ci.org/cruisercoder/dstddb)
 
+### Quickstart with Dub
+
+Add a dub.sdl file 
+```
+name "demo"
+libs "sqlite3"
+dependency "dstddb" version="*"
+versions "StdLoggerDisableLogging"
+targetType "executable"
+```
+
+Add a simple example in src/demo.d
+```D
+void main() {
+    import std.database.sqlite;
+    auto db = createDatabase("file:///testdb.sqlite");
+    auto con = db.connection;
+    con.query("drop table if exists score");
+    con.query("create table score(name varchar(10), score integer)");
+    con.query("insert into score values('Knuth',71)");
+    con.query("insert into score values('Dijkstra',82)");
+    con.query("insert into score values('Hopper',98)");
+    auto rows = con.query("select name,score from score").rows;
+    foreach (r; rows) writeln(r[0].as !string, ",", r[1].as !int);
+}
+```
+
+Run it:
+```sh
+dub
+```
+
+
 ### Roadmap Highlights
 - A database and driver neutral interface specification
 - Reference counted value objects provide ease of use
@@ -21,13 +54,6 @@ Available in [DUB](https://code.dlang.org/packages/dstddb), the D package regist
 - Input variable binding support
 - Array input/output binding support
 - Connection pooling
-
-### Related Work
-[CPPSTDDB](https://github.com/cruisercoder/cppstddb) is a related project with
-similar objectives tailored to the constraints of the C++ language.  The aim is
-for both projects to complement each other by proving the validity of specific
-design choices that apply to both and to draw on implementation correctness 
-re-enforced from dual language development.
 
 ## Examples
 
@@ -99,8 +125,14 @@ Database.register!(std.database.mysql.Database)();
 Database.register!(std.database.oracle.Database)();
 auto db = createDatabase("mydb");
 ```
-
 ### Notes
 
 - The reference implementations use logging (std.experimental.logger). To hide the info logging, add this line to your package.json file: "versions": ["StdLoggerDisableInfo"].
+
+### Related Work
+[CPPSTDDB](https://github.com/cruisercoder/cppstddb) is a related project with
+similar objectives tailored to the constraints of the C++ language.  The aim is
+for both projects to complement each other by proving the validity of specific
+design choices that apply to both and to draw on implementation correctness 
+re-enforced from dual language development.
 
